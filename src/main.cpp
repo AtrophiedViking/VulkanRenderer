@@ -8,6 +8,7 @@ int main() {
 			.windowWidth = 800,
 			.windowHeight = 600, 
 			.swapchainBuffering = SWAPCHAIN_TRIPPLE_BUFFERING,
+			.backgroundColor = {0.04f,0.015f,0.04f},
 		}
 	};
 	init(&state);

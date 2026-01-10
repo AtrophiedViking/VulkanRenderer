@@ -61,15 +61,26 @@ void windowCreate(State* state) {
 	swapchainCreate(state);
 	imageViewsCreate(state);
 	renderPassCreate(state);
+	descriptorSetLayoutCreate(state);
 	graphicsPipelineCreate(state);
 	frameBuffersCreate(state);
 	commandPoolCreate(state);
+	vertexBufferCreate(state);
+	indexBufferCreate(state);
+	uniformBuffersCreate(state);
+	descriptorPoolCreate(state);
+	descriptorSetsCreate(state);
 	commandBufferGet(state);
 	commandBufferRecord(state);
 	syncObjectsCreate(state);
 };
 void windowDestroy(State* state) {
 	swapchainCleanup(state);
+	uniformBuffersDestroy(state);
+	descriptorPoolDestroy(state);
+	descriptorSetLayoutDestroy(state);
+	indexBufferDestroy(state);
+	vertexBufferDestroy(state);
 	syncObjectsDestroy(state);
 	commandPoolDestroy(state);
 	graphicsPipelineDestroy(state);
@@ -229,6 +240,7 @@ void frameDraw(State* state) {
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		throw std::runtime_error("failed to present swap chain image!");
 	}
+	uniformBuffersUpdate(state);
 	vkResetFences(state->context.device, 1, &state->renderer.inFlightFence[state->renderer.frameIndex]);
 	vkResetCommandBuffer(state->renderer.commandBuffer[state->renderer.frameIndex],/*VkCommandBufferResetFlagBits*/0);
 	commandBufferRecord(state);
