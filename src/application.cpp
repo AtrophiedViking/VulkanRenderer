@@ -1,0 +1,19 @@
+#include "headers/application.h"
+
+void init(State *state) {
+	errorHandlingSetup(state);
+	logPrint(state);
+	windowCreate(state);
+};
+
+void mainloop(State *state) {
+	while (!glfwWindowShouldClose(state->window.handle)) {
+		glfwPollEvents();
+		frameDraw(state);
+	};
+		vkDeviceWaitIdle(state->context.device);
+};
+
+void cleanup(State *state) {
+	windowDestroy(state);
+};
