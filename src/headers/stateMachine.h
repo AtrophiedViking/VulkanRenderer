@@ -1,8 +1,10 @@
 #pragma once
-#define GLM_FORCE_RADIANS
 #define GLFW_INCLUDE_VULKAN
+#define STB_IMPLEMENTATION
+#define GLM_FORCE_RADIANS
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan_core.h>
+#include <stb_image.h>
 #include <cstdio>
 #include <cstdlib>
 #include <signal.h>
@@ -85,6 +87,10 @@ typedef struct {
 }Context;
 
 typedef struct {
+
+}Gui;
+
+typedef struct {
 	VkSwapchainKHR handle;
 
 	uint32_t imageCount;
@@ -104,22 +110,27 @@ typedef struct {
 }Window;
 
 typedef struct {
+	VkCommandBuffer* commandBuffer;
+	VkFramebuffer* framebuffers;
+	VkBuffer vertexBuffer;
+	VkDeviceMemory vertexBufferMemory;
+	VkBuffer indexBuffer;
+	VkDeviceMemory indexBufferMemory;
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	VkBuffer* uniformBuffers;
+	VkDeviceMemory* uniformBuffersMemory;
+	std::vector<void*> uniformBuffersMapped;
+}Buffers;
+
+typedef struct {
 	VkPipeline graphicsPipeline;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkRenderPass renderPass;
 	VkCommandPool commandPool;
-	VkFramebuffer *framebuffers;
-	VkBuffer vertexBuffer;
-	VkDeviceMemory vertexBufferMemory;
-	VkBuffer indexBuffer;
-	VkDeviceMemory indexBufferMemory;
-	VkBuffer *uniformBuffers;
-	VkDeviceMemory *uniformBuffersMemory;
-	std::vector<void*> uniformBuffersMapped;
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet *descriptorSets;
-	VkCommandBuffer *commandBuffer;
 	uint32_t imageAquiredIndex;
 	VkSemaphore *imageAvailableSemaphore;
 	VkSemaphore *renderFinishedSemaphore;
@@ -135,6 +146,7 @@ typedef struct {
 	Window window;
 	Context context;
 	Renderer renderer;
+	Buffers buffers;
 }State;
 
 enum SwapchainBuffering {

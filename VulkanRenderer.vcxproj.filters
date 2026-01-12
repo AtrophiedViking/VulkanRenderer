@@ -12,6 +12,12 @@
     <Filter Include="Source Files\Header Files">
       <UniqueIdentifier>{7857e5bd-66b5-41bb-8b05-d68fa0734dfe}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\shaders">
+      <UniqueIdentifier>{b99260d4-4513-4409-9743-310d57003705}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\textures">
+      <UniqueIdentifier>{0d70b477-4c12-489b-ad58-eebb51a1edb1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -27,6 +33,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\textures.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\buffers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -46,13 +61,22 @@
     <ClInclude Include="src\headers\renderer.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\headers\gui.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\headers\texture.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\headers\buffers.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="res\vert.spv">
-      <Filter>Resource Files</Filter>
+    <None Include="res\shaders\frag.spv">
+      <Filter>Resource Files\shaders</Filter>
     </None>
-    <None Include="res\frag.spv">
-      <Filter>Resource Files</Filter>
+    <None Include="res\shaders\vert.spv">
+      <Filter>Resource Files\shaders</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -65,6 +65,9 @@ void windowCreate(State* state) {
 	graphicsPipelineCreate(state);
 	frameBuffersCreate(state);
 	commandPoolCreate(state);
+
+	textureImagesCreate(state);
+
 	vertexBufferCreate(state);
 	indexBufferCreate(state);
 	uniformBuffersCreate(state);
@@ -228,7 +231,6 @@ void swapchainRecreate(State* state) {
 	frameBuffersCreate(state);
 };
 
-
 //Draw
 void frameDraw(State* state) {
 	vkWaitForFences(state->context.device, 1, &state->renderer.inFlightFence[state->renderer.frameIndex], VK_TRUE, UINT64_MAX);
@@ -242,7 +244,7 @@ void frameDraw(State* state) {
 	}
 	uniformBuffersUpdate(state);
 	vkResetFences(state->context.device, 1, &state->renderer.inFlightFence[state->renderer.frameIndex]);
-	vkResetCommandBuffer(state->renderer.commandBuffer[state->renderer.frameIndex],/*VkCommandBufferResetFlagBits*/0);
+	vkResetCommandBuffer(state->buffers.commandBuffer[state->renderer.frameIndex],/*VkCommandBufferResetFlagBits*/0);
 	commandBufferRecord(state);
 
 
@@ -257,7 +259,7 @@ void frameDraw(State* state) {
 		.pWaitSemaphores = waitSemaphores,
 		.pWaitDstStageMask = waitStages,
 		.commandBufferCount = 1,
-		.pCommandBuffers = &state->renderer.commandBuffer[state->renderer.frameIndex],
+		.pCommandBuffers = &state->buffers.commandBuffer[state->renderer.frameIndex],
 		.signalSemaphoreCount = 1,
 		.pSignalSemaphores = signalSemaphores,
 	};

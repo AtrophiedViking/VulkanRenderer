@@ -128,21 +128,27 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
+    <ClCompile Include="src\buffers.cpp" />
     <ClCompile Include="src\context.cpp" />
+    <ClCompile Include="src\gui.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\renderer.cpp" />
+    <ClCompile Include="src\textures.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\headers\application.h" />
+    <ClInclude Include="src\headers\buffers.h" />
     <ClInclude Include="src\headers\context.h" />
+    <ClInclude Include="src\headers\gui.h" />
     <ClInclude Include="src\headers\renderer.h" />
     <ClInclude Include="src\headers\stateMachine.h" />
+    <ClInclude Include="src\headers\texture.h" />
     <ClInclude Include="src\headers\window.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="res\frag.spv" />
-    <None Include="res\vert.spv" />
+    <None Include="res\shaders\frag.spv" />
+    <None Include="res\shaders\vert.spv" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
