@@ -1,10 +1,11 @@
 #include "headers/buffers.h"
 //Utility
-static uint32_t findMemoryType(State* state, VkMemoryPropertyFlags properties) {
-	vkGetPhysicalDeviceMemoryProperties(state->context.physicalDevice, &state->renderer.memProperties);
+uint32_t findMemoryType(State* state, VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties) {
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(state->context.physicalDevice, &memProperties);
 
-	for (uint32_t i = 0; i < state->renderer.memProperties.memoryTypeCount; i++) {
-		if ((state->renderer.memRequirements.memoryTypeBits & (1 << i)) && (state->renderer.memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+		if ((memRequirements.memoryTypeBits & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
 			return i;
 		}
 	}
@@ -22,13 +23,15 @@ void createBuffer(State* state, VkDeviceSize size, VkBufferUsageFlags usage, VkM
 	if (vkCreateBuffer(state->context.device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create buffer!");
 	}
-
-	vkGetBufferMemoryRequirements(state->context.device, buffer, &state->renderer.memRequirements);
+	uint32_t memType;
+	VkMemoryRequirements memRequirements;
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetBufferMemoryRequirements(state->context.device, buffer, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = state->renderer.memRequirements.size;
-	allocInfo.memoryTypeIndex = findMemoryType(state, properties);
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(state,memRequirements, properties);
 
 	if (vkAllocateMemory(state->context.device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate buffer memory!");
@@ -36,13 +39,13 @@ void createBuffer(State* state, VkDeviceSize size, VkBufferUsageFlags usage, VkM
 
 	vkBindBufferMemory(state->context.device, buffer, bufferMemory, 0);
 }
-void copyBuffer(State* state, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-	VkCommandBufferAllocateInfo allocInfo{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = state->renderer.commandPool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1,
-	};
+VkCommandBuffer beginSingleTimeCommands(State* state) {
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool = state->renderer.commandPool;
+	allocInfo.commandBufferCount = 1;
+
 	VkCommandBuffer commandBuffer;
 	vkAllocateCommandBuffers(state->context.device, &allocInfo, &commandBuffer);
 
@@ -51,11 +54,10 @@ void copyBuffer(State* state, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSi
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
 	vkBeginCommandBuffer(commandBuffer, &beginInfo);
-	VkBufferCopy copyRegion{};
-	copyRegion.srcOffset = 0; // Optional
-	copyRegion.dstOffset = 0; // Optional
-	copyRegion.size = size;
-	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+	return commandBuffer;
+}
+void endSingleTimeCommands(State *state,VkCommandBuffer commandBuffer) {
 	vkEndCommandBuffer(commandBuffer);
 
 	VkSubmitInfo submitInfo{};
@@ -65,7 +67,17 @@ void copyBuffer(State* state, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSi
 
 	vkQueueSubmit(state->context.queue, 1, &submitInfo, VK_NULL_HANDLE);
 	vkQueueWaitIdle(state->context.queue);
+
 	vkFreeCommandBuffers(state->context.device, state->renderer.commandPool, 1, &commandBuffer);
+}
+void copyBuffer(State* state, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+	VkCommandBuffer commandBuffer = beginSingleTimeCommands(state);
+
+	VkBufferCopy copyRegion{};
+	copyRegion.size = size;
+	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+	endSingleTimeCommands(state, commandBuffer);
 };
 
 void frameBuffersCreate(State* state) {

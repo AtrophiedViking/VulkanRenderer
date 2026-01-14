@@ -143,12 +143,15 @@
     <ClInclude Include="src\headers\gui.h" />
     <ClInclude Include="src\headers\renderer.h" />
     <ClInclude Include="src\headers\stateMachine.h" />
-    <ClInclude Include="src\headers\texture.h" />
+    <ClInclude Include="src\headers\textures.h" />
     <ClInclude Include="src\headers\window.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="res\shaders\frag.spv" />
     <None Include="res\shaders\vert.spv" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\textures\texture.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -59,6 +59,7 @@ void windowCreate(State* state) {
 	surfaceCreate(state);
 	deviceCreate(state);
 	swapchainCreate(state);
+	swapchainImageGet(state);
 	imageViewsCreate(state);
 	renderPassCreate(state);
 	descriptorSetLayoutCreate(state);
@@ -66,7 +67,9 @@ void windowCreate(State* state) {
 	frameBuffersCreate(state);
 	commandPoolCreate(state);
 
-	textureImagesCreate(state);
+	textureImageCreate(state);
+	textureImageViewCreate(state);
+	textureSamplerCreate(state);
 
 	vertexBufferCreate(state);
 	indexBufferCreate(state);
@@ -79,6 +82,9 @@ void windowCreate(State* state) {
 };
 void windowDestroy(State* state) {
 	swapchainCleanup(state);
+	textureSamplerDestroy(state);
+	textureImageViewDestroy(state);
+	textureImageDestroy(state);
 	uniformBuffersDestroy(state);
 	descriptorPoolDestroy(state);
 	descriptorSetLayoutDestroy(state);
@@ -150,27 +156,12 @@ void swapchainImageGet(State* state) {
 	PANIC(vkGetSwapchainImagesKHR(state->context.device, state->window.swapchain.handle, &state->window.swapchain.imageCount, state->window.swapchain.images), "Failed To Get Swapchain Images");
 };
 void imageViewsCreate(State* state) {
-	swapchainImageGet(state);
 	state->window.swapchain.imageViews = (VkImageView *)malloc(state->window.swapchain.imageCount * sizeof(VkImageView));
 	PANIC(!state->window.swapchain.imageViews, "Failed To Count ImageViews");
-	
-	
-	for (int i = 0; i < (int)state->window.swapchain.imageCount; i++) {
-		VkImageSubresourceRange imageSubResourceRange{
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.levelCount = 1,
-			.layerCount = 1,
-		};
-		VkImageViewCreateInfo imageViewInfo{
-			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-			.image = state->window.swapchain.images[i],
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.format = state->window.swapchain.format,
-			.components = state->config.swapchainComponentsMapping,
-			.subresourceRange = imageSubResourceRange,
-		};
-		PANIC(vkCreateImageView(state->context.device, &imageViewInfo, nullptr, &state->window.swapchain.imageViews[i]), "Failed To Create Image View %i", i);
-	};
+
+	for (uint32_t i = 0; i < state->window.swapchain.imageCount; i++) {
+		state->window.swapchain.imageViews[i] = imageViewCreate(state, state->window.swapchain.images[i], state->window.swapchain.format);
+	}
 };
 void imageViewsDestroy(State* state) {
 	for (int i = 0; i < (int)state->window.swapchain.imageCount; i++) {
@@ -227,6 +218,7 @@ void swapchainRecreate(State* state) {
 	vkDeviceWaitIdle(state->context.device);
 	swapchainCleanup(state);
 	swapchainCreate(state);
+	swapchainImageGet(state);
 	imageViewsCreate(state);
 	frameBuffersCreate(state);
 };

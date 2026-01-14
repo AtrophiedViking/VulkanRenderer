@@ -64,7 +64,7 @@
     <ClInclude Include="src\headers\gui.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\headers\texture.h">
+    <ClInclude Include="src\headers\textures.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\headers\buffers.h">
@@ -78,5 +78,10 @@
     <None Include="res\shaders\vert.spv">
       <Filter>Resource Files\shaders</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\textures\texture.png">
+      <Filter>Resource Files\textures</Filter>
+    </Image>
   </ItemGroup>
 </Project>

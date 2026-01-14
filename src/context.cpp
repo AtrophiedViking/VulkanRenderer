@@ -74,12 +74,16 @@ void deviceCreate(State* state) {
 	VkDeviceQueueCreateInfo deviceQueueInfos[]{ {} };
 
 	const char* deviceExtensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+	VkPhysicalDeviceFeatures deviceFeatures{
+		.samplerAnisotropy = VK_TRUE,
+	};
 	VkDeviceCreateInfo deviceInfo{
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 		.queueCreateInfoCount = 1,
 		.pQueueCreateInfos = &deviceQueueInfo,
 		.enabledExtensionCount = 1,
 		.ppEnabledExtensionNames = &deviceExtensions,
+		.pEnabledFeatures = &deviceFeatures,
 	};
 	PANIC(vkCreateDevice(state->context.physicalDevice, &deviceInfo, nullptr, &state->context.device), "Failed To Create Device");
 	vkGetDeviceQueue(state->context.device, state->context.queueFamilyIndex, 0, &state->context.queue);
