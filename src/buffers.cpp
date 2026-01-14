@@ -88,19 +88,19 @@ void frameBuffersCreate(State* state) {
 	VkExtent2D framebufferExtent = state->window.swapchain.imageExtent;
 
 	for (int i = 0; i < (int)frameBufferCount; i++) {
-		VkImageView attachments[] = {
-			state->window.swapchain.imageViews[i]
+		std::array<VkImageView, 2> attachments = {
+			state->window.swapchain.imageViews[i],
+			state->textures.depthImageView
 		};
 
-		VkFramebufferCreateInfo framebufferInfo{
-			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-			.renderPass = state->renderer.renderPass,
-			.attachmentCount = 1,
-			.pAttachments = attachments,
-			.width = state->window.swapchain.imageExtent.width,
-			.height = state->window.swapchain.imageExtent.height,
-			.layers = 1,
-		};
+		VkFramebufferCreateInfo framebufferInfo{};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = state->renderer.renderPass;
+		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+		framebufferInfo.pAttachments = attachments.data();
+		framebufferInfo.width = state->window.swapchain.imageExtent.width;
+		framebufferInfo.height = state->window.swapchain.imageExtent.height;
+		framebufferInfo.layers = 1;
 		PANIC(vkCreateFramebuffer(state->context.device, &framebufferInfo, nullptr, &state->buffers.framebuffers[i]), "Failed To Create Framebuffer");
 
 	};
@@ -210,13 +210,17 @@ void commandBufferRecord(State* state) {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 	};
 	vkBeginCommandBuffer(state->buffers.commandBuffer[state->renderer.frameIndex], &beginInfo);
-	VkClearValue clearColor = state->config.backgroundColor;
+
+	std::array<VkClearValue, 2> clearValues{};
+	clearValues[0].color = { state->config.backgroundColor.color };
+	clearValues[1].depthStencil = { 1.0f, 0 };
+
 	VkRenderPassBeginInfo renderPassInfo{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass = state->renderer.renderPass,
 		.framebuffer = state->buffers.framebuffers[state->renderer.imageAquiredIndex],
-		.clearValueCount = 1,
-		.pClearValues = &clearColor
+		.clearValueCount = static_cast<uint32_t>(clearValues.size()),
+		.pClearValues = clearValues.data()
 	};
 	renderPassInfo.renderArea.offset = { 0, 0 };
 	renderPassInfo.renderArea.extent = state->window.swapchain.imageExtent;
