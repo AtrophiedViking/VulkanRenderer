@@ -6,9 +6,11 @@ int main() {
 			.windowTitle = "Vulkan Triangle",
 			.windowResizable = true,
 			.windowWidth = 800,
-			.windowHeight = 600, 
+			.windowHeight = 600,
 			.swapchainBuffering = SWAPCHAIN_TRIPPLE_BUFFERING,
 			.backgroundColor = {0.04f,0.015f,0.04f},
+			.TEXTURE_PATH = "res/textures/viking_room.png",
+			.MODEL_PATH = "res/models/viking_room.obj",
 		}
 	};
 	init(&state);

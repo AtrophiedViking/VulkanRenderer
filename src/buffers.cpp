@@ -23,9 +23,7 @@ void createBuffer(State* state, VkDeviceSize size, VkBufferUsageFlags usage, VkM
 	if (vkCreateBuffer(state->context.device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create buffer!");
 	}
-	uint32_t memType;
 	VkMemoryRequirements memRequirements;
-	VkPhysicalDeviceMemoryProperties memProperties;
 	vkGetBufferMemoryRequirements(state->context.device, buffer, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo{};
@@ -114,7 +112,7 @@ void frameBuffersDestroy(State* state) {
 };
 
 void vertexBufferCreate(State* state) {
-	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+	VkDeviceSize bufferSize = sizeof(state->meshes.vertices[0]) * state->meshes.vertices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -122,7 +120,7 @@ void vertexBufferCreate(State* state) {
 
 	void* data;
 	vkMapMemory(state->context.device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, vertices.data(), (size_t)bufferSize);
+	memcpy(data, state->meshes.vertices.data(), (size_t)bufferSize);
 	vkUnmapMemory(state->context.device, stagingBufferMemory);
 
 
@@ -138,7 +136,7 @@ void vertexBufferDestroy(State* state) {
 };
 
 void indexBufferCreate(State* state) {
-	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+	VkDeviceSize bufferSize = sizeof(state->meshes.indices[0]) * state->meshes.indices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -146,7 +144,7 @@ void indexBufferCreate(State* state) {
 
 	void* data;
 	vkMapMemory(state->context.device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, indices.data(), (size_t)bufferSize);
+	memcpy(data, state->meshes.indices.data(), (size_t)bufferSize);
 	vkUnmapMemory(state->context.device, stagingBufferMemory);
 
 	createBuffer(state, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->buffers.indexBuffer, state->buffers.indexBufferMemory);
@@ -230,7 +228,7 @@ void commandBufferRecord(State* state) {
 	VkBuffer vertexBuffers[] = { state->buffers.vertexBuffer };
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(state->buffers.commandBuffer[state->renderer.frameIndex], 0, 1, vertexBuffers, offsets);
-	vkCmdBindIndexBuffer(state->buffers.commandBuffer[state->renderer.frameIndex], state->buffers.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+	vkCmdBindIndexBuffer(state->buffers.commandBuffer[state->renderer.frameIndex], state->buffers.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 	VkViewport viewport{
 		.x = 0.0f,
@@ -247,7 +245,7 @@ void commandBufferRecord(State* state) {
 		.extent = state->window.swapchain.imageExtent,
 	};
 	vkCmdSetScissor(state->buffers.commandBuffer[state->renderer.frameIndex], 0, 1, &scissor);
-	vkCmdDrawIndexed(state->buffers.commandBuffer[state->renderer.frameIndex], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+	vkCmdDrawIndexed(state->buffers.commandBuffer[state->renderer.frameIndex], static_cast<uint32_t>(state->meshes.indices.size()), 1, 0, 0, 0);
 	vkCmdEndRenderPass(state->buffers.commandBuffer[state->renderer.frameIndex]);
 	PANIC(vkEndCommandBuffer(state->buffers.commandBuffer[state->renderer.frameIndex]), "Failed To Record Command Buffer");
 };

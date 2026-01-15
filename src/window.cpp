@@ -73,6 +73,8 @@ void windowCreate(State* state) {
 	textureImageViewCreate(state);
 	textureSamplerCreate(state);
 
+	modelLoad(state);
+
 	vertexBufferCreate(state);
 	indexBufferCreate(state);
 	uniformBuffersCreate(state);

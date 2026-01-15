@@ -157,7 +157,7 @@ void copyBufferToImage(State *state, VkBuffer buffer, VkImage image, uint32_t wi
 void textureImageCreate(State* state) {
     //image creation
     int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load("res/textures/texture.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load(state->config.TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = (uint64_t)texWidth * (uint64_t)texHeight * 4;
 
     PANIC(!pixels, "failed to load texture image!");
