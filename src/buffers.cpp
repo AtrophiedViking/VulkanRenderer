@@ -86,9 +86,10 @@ void frameBuffersCreate(State* state) {
 	VkExtent2D framebufferExtent = state->window.swapchain.imageExtent;
 
 	for (int i = 0; i < (int)frameBufferCount; i++) {
-		std::array<VkImageView, 2> attachments = {
-			state->window.swapchain.imageViews[i],
-			state->textures.depthImageView
+		std::array<VkImageView, 3> attachments = {
+			state->textures.colorImageView,
+			state->textures.depthImageView,
+			state->window.swapchain.imageViews[i]
 		};
 
 		VkFramebufferCreateInfo framebufferInfo{};

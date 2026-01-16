@@ -9,6 +9,7 @@ int main() {
 			.windowHeight = 600,
 			.swapchainBuffering = SWAPCHAIN_TRIPPLE_BUFFERING,
 			.backgroundColor = {0.04f,0.015f,0.04f},
+			.msaaSamples = VK_SAMPLE_COUNT_1_BIT,
 			.TEXTURE_PATH = "res/textures/viking_room.png",
 			.MODEL_PATH = "res/models/viking_room.obj",
 		}

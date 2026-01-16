@@ -66,6 +66,7 @@ void windowCreate(State* state) {
 	graphicsPipelineCreate(state);
 	commandPoolCreate(state);
 
+	colorResourceCreate(state);
 	depthResourceCreate(state);
 	frameBuffersCreate(state);
 
@@ -164,7 +165,7 @@ void imageViewsCreate(State* state) {
 	PANIC(!state->window.swapchain.imageViews, "Failed To Count ImageViews");
 
 	for (uint32_t i = 0; i < state->window.swapchain.imageCount; i++) {
-		state->window.swapchain.imageViews[i] = imageViewCreate(state, state->window.swapchain.images[i], state->window.swapchain.format, VK_IMAGE_ASPECT_COLOR_BIT);
+		state->window.swapchain.imageViews[i] = imageViewCreate(state, state->window.swapchain.images[i], state->window.swapchain.format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 	}
 };
 void imageViewsDestroy(State* state) {
@@ -207,6 +208,7 @@ void swapchainDestroy(State* state) {
 };
 
 void swapchainCleanup(State* state) {
+	colorResourceDestroy(state);
 	depthBufferDestroy(state),
 	frameBuffersDestroy(state);
 	imageViewsDestroy(state);
@@ -225,6 +227,7 @@ void swapchainRecreate(State* state) {
 	swapchainCreate(state);
 	swapchainImageGet(state);
 	imageViewsCreate(state);
+	colorResourceCreate(state);
 	depthResourceCreate(state);
 	frameBuffersCreate(state);
 };

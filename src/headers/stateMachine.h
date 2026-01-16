@@ -88,6 +88,7 @@ typedef struct {
 	VkAllocationCallbacks allocator;
 	VkComponentMapping swapchainComponentsMapping;
 	VkClearValue backgroundColor;
+	VkSampleCountFlagBits msaaSamples;
 	const std::string TEXTURE_PATH;
 	const std::string MODEL_PATH;
 }Config;
@@ -148,6 +149,11 @@ typedef struct {
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
 	VkImageView depthImageView;
+	uint32_t mipLevels;
+
+	VkImage colorImage;
+	VkDeviceMemory colorImageMemory;
+	VkImageView colorImageView;
 }Textures;
 
 typedef struct {
