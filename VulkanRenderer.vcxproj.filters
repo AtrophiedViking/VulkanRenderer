@@ -44,7 +44,10 @@
     <ClCompile Include="src\buffers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\meshes.cpp">
+    <ClCompile Include="src\models.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\scene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -73,7 +76,10 @@
     <ClInclude Include="src\headers\buffers.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\headers\meshes.h">
+    <ClInclude Include="src\headers\models.h">
+      <Filter>Source Files\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\headers\scene.h">
       <Filter>Source Files\Header Files</Filter>
     </ClInclude>
   </ItemGroup>

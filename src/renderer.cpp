@@ -204,7 +204,7 @@ void graphicsPipelineCreate(State* state) {
 	.depthClampEnable = VK_FALSE,
 	.rasterizerDiscardEnable = VK_FALSE,
 	.polygonMode = VK_POLYGON_MODE_FILL,
-	.cullMode = VK_CULL_MODE_BACK_BIT,
+	.cullMode = VK_CULL_MODE_FRONT_BIT,
 	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 	.depthBiasEnable = VK_FALSE,
 	.lineWidth = 1.0f,
@@ -294,60 +294,63 @@ void commandPoolDestroy(State* state) {
 void descriptorPoolCreate(State* state) {
 	std::array<VkDescriptorPoolSize, 2> poolSizes{};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = static_cast<uint32_t>(state->config.swapchainBuffering);
+	poolSizes[0].descriptorCount = static_cast<uint32_t>(state->config.swapchainBuffering * objectsMax);
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = static_cast<uint32_t>(state->config.swapchainBuffering);
+	poolSizes[1].descriptorCount = static_cast<uint32_t>(state->config.swapchainBuffering * objectsMax);
 
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = static_cast<uint32_t>(state->config.swapchainBuffering);
+	poolInfo.maxSets = static_cast<uint32_t>(state->config.swapchainBuffering * objectsMax);
 	vkCreateDescriptorPool(state->context.device, &poolInfo, nullptr, &state->renderer.descriptorPool);
 };
 void descriptorSetsCreate(State* state) {
-	std::vector<VkDescriptorSetLayout> layouts(state->config.swapchainBuffering, state->renderer.descriptorSetLayout);
-	VkDescriptorSetAllocateInfo allocInfo{
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.descriptorPool = state->renderer.descriptorPool,
-		.descriptorSetCount = static_cast<uint32_t>(state->config.swapchainBuffering),
-		.pSetLayouts = layouts.data(),
-	};
-	state->renderer.descriptorSets = (VkDescriptorSet*)malloc(state->config.swapchainBuffering * sizeof(VkDescriptorSet));
-	PANIC(!state->renderer.descriptorSets, "Failed to Allocate DescriptorSets Memory")
-	PANIC(vkAllocateDescriptorSets(state->context.device, &allocInfo, state->renderer.descriptorSets), "Failed To Allocate Descriptor Set Memory");
+	for (auto& gameObject : state->scene.gameObjects) {
 
-	for (size_t i = 0; i < state->config.swapchainBuffering; i++) {
-		VkDescriptorBufferInfo bufferInfo{
-			.buffer = state->buffers.uniformBuffers[i],
-			.offset = 0,
-			.range = sizeof(UniformBufferObject),
+
+		std::vector<VkDescriptorSetLayout> layouts(state->config.swapchainBuffering, state->renderer.descriptorSetLayout);
+		VkDescriptorSetAllocateInfo allocInfo{
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.descriptorPool = state->renderer.descriptorPool,
+			.descriptorSetCount = static_cast<uint32_t>(layouts.size()),
+			.pSetLayouts = layouts.data(),
 		};
+		gameObject.descriptorSets.clear();
+		gameObject.descriptorSets.resize(state->config.swapchainBuffering);
+		vkAllocateDescriptorSets(state->context.device, &allocInfo, &gameObject.descriptorSets[state->renderer.frameIndex]);
+		for (size_t i = 0; i < state->config.swapchainBuffering; i++) {
+			VkDescriptorBufferInfo bufferInfo{
+				.buffer = gameObject.uniformBuffers[i],
+				.offset = 0,
+				.range = sizeof(UniformBufferObject),
+			};
 
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = state->textures.textureImageView;
-		imageInfo.sampler = state->textures.textureSampler;
+			VkDescriptorImageInfo imageInfo{};
+			imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageInfo.imageView = state->textures.textureImageView;
+			imageInfo.sampler = state->textures.textureSampler;
 
-		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+			std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
-		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[0].dstSet = state->renderer.descriptorSets[i];
-		descriptorWrites[0].dstBinding = 0;
-		descriptorWrites[0].dstArrayElement = 0;
-		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[0].descriptorCount = 1;
-		descriptorWrites[0].pBufferInfo = &bufferInfo;
+			descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[0].dstSet = gameObject.descriptorSets[i];
+			descriptorWrites[0].dstBinding = 0;
+			descriptorWrites[0].dstArrayElement = 0;
+			descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorWrites[0].descriptorCount = 1;
+			descriptorWrites[0].pBufferInfo = &bufferInfo;
 
-		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[1].dstSet = state->renderer.descriptorSets[i];
-		descriptorWrites[1].dstBinding = 1;
-		descriptorWrites[1].dstArrayElement = 0;
-		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrites[1].descriptorCount = 1;
-		descriptorWrites[1].pImageInfo = &imageInfo;
+			descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[1].dstSet = gameObject.descriptorSets[i];
+			descriptorWrites[1].dstBinding = 1;
+			descriptorWrites[1].dstArrayElement = 0;
+			descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorWrites[1].descriptorCount = 1;
+			descriptorWrites[1].pImageInfo = &imageInfo;
 
-		vkUpdateDescriptorSets(state->context.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+			vkUpdateDescriptorSets(state->context.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+		};
 	};
 };
 void descriptorPoolDestroy(State* state) {

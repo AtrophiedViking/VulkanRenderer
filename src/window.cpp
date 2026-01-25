@@ -1,5 +1,5 @@
 #include "headers/window.h"
-//Error Handling
+//Error Handlin
 void logPrint(State* state) {
 	uint32_t instanceApiVersion;
 	PANIC(vkEnumerateInstanceVersion(&instanceApiVersion), "Failed To Enumerate Instance Version");
@@ -70,11 +70,12 @@ void windowCreate(State* state) {
 	depthResourceCreate(state);
 	frameBuffersCreate(state);
 
-	textureImageCreate(state);
+	textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
 	textureImageViewCreate(state);
 	textureSamplerCreate(state);
 
-	modelLoad(state);
+	modelLoad(state, state->config.KOBOLD_MODEL_PATH);
+	gameObjectsCreate(state);
 
 	vertexBufferCreate(state);
 	indexBufferCreate(state);

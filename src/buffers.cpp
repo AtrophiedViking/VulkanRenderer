@@ -161,36 +161,65 @@ void indexBufferDestroy(State* state) {
 };
 
 void uniformBuffersCreate(State* state) {
-	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+	for (auto& gameObject : state->scene.gameObjects) {
+		gameObject.uniformBuffers.clear();
+		gameObject.uniformBuffersMemory.clear();
+		gameObject.uniformBuffersMapped.clear();
 
-	state->buffers.uniformBuffers = (VkBuffer*)malloc(state->config.swapchainBuffering * sizeof(VkBuffer));
-	state->buffers.uniformBuffersMemory = (VkDeviceMemory*)malloc(state->config.swapchainBuffering * sizeof(VkDeviceMemory));
-	state->buffers.uniformBuffersMapped.resize(state->config.swapchainBuffering);
-	PANIC(!state->buffers.uniformBuffers || !state->buffers.uniformBuffersMemory, "Failed To Allocate Uniform Buffer Memory");
-	for (size_t i = 0; i < state->config.swapchainBuffering; i++) {
-		createBuffer(state, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, state->buffers.uniformBuffers[i], state->buffers.uniformBuffersMemory[i]);
+		// Create uniform buffers for each frame in flight
+		for (size_t i = 0; i < state->config.swapchainBuffering; i++) {
+			VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+			VkBuffer buffer({});
+			VkDeviceMemory bufferMem({});
 
-		vkMapMemory(state->context.device, state->buffers.uniformBuffersMemory[i], 0, bufferSize, 0, &state->buffers.uniformBuffersMapped[i]);
-	};
+			createBuffer(state, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buffer, bufferMem);
+
+			gameObject.uniformBuffers.emplace_back(std::move(buffer));
+			gameObject.uniformBuffersMemory.emplace_back(std::move(bufferMem));
+			gameObject.uniformBuffersMapped.resize(gameObject.uniformBuffersMemory.size());
+			vkMapMemory(state->context.device, gameObject.uniformBuffersMemory[i], 0, bufferSize, 0, &gameObject.uniformBuffersMapped[i]);
+
+		}
+	}
 };
 void uniformBuffersUpdate(State* state) {
 	static auto startTime = std::chrono::high_resolution_clock::now();
-
 	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-	//ViewPort Matric
-	UniformBufferObject ubo{
-		.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-		.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-		.proj = glm::perspective(glm::radians(45.0f), state->window.swapchain.imageExtent.width / (float)state->window.swapchain.imageExtent.height, 0.1f, 10.0f),
-	};
-	ubo.proj[1][1] *= -1,
-		memcpy(state->buffers.uniformBuffersMapped[state->renderer.imageAquiredIndex], &ubo, sizeof(ubo));
+	float time = std::chrono::duration<float>(currentTime - startTime).count();
+
+	// Camera and projection matrices (shared by all objects)
+	glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 6.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 proj = glm::perspective(glm::radians(45.0f),
+		static_cast<float>(state->window.swapchain.imageExtent.width) / static_cast<float>(state->window.swapchain.imageExtent.height),
+		0.1f, 20.0f);
+	proj[1][1] *= -1; // Flip Y for Vulkan
+
+	// Update uniform buffers for each object
+	for (auto& gameObject : state->scene.gameObjects) {
+		// Apply continuous rotation to the object
+		gameObject.rotation.y += 0.001f; // Slow rotation around Y axis
+
+		// Get the model matrix for this object
+		glm::mat4 initialRotation = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+		glm::mat4 model = gameObject.getModelMatrix() * initialRotation;
+
+		// Create and update the UBO
+		UniformBufferObject ubo{
+			.model = model,
+			.view = view,
+			.proj = proj
+		};
+
+		// Copy the UBO data to the mapped memory
+		memcpy(gameObject.uniformBuffersMapped[state->renderer.frameIndex], &ubo, sizeof(ubo));
+	}
 };
 void uniformBuffersDestroy(State* state) {
-	for (size_t i = 0; i < state->config.swapchainBuffering; i++) {
-		vkDestroyBuffer(state->context.device, state->buffers.uniformBuffers[i], nullptr);
-		vkFreeMemory(state->context.device, state->buffers.uniformBuffersMemory[i], nullptr);
+	for (auto& gameObject : state->scene.gameObjects) {
+		for (size_t i = 0; i < state->config.swapchainBuffering; i++) {
+			vkDestroyBuffer(state->context.device, gameObject.uniformBuffers[i], nullptr);
+			vkFreeMemory(state->context.device, gameObject.uniformBuffersMemory[i], nullptr);
+		};
 	};
 };
 
@@ -240,13 +269,19 @@ void commandBufferRecord(State* state) {
 		.maxDepth = 1.0f,
 	};
 	vkCmdSetViewport(state->buffers.commandBuffer[state->renderer.frameIndex], 0, 1, &viewport);
-	vkCmdBindDescriptorSets(state->buffers.commandBuffer[state->renderer.frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.pipelineLayout, 0, 1, &state->renderer.descriptorSets[state->renderer.frameIndex], 0, nullptr);
 	VkRect2D scissor{
 		.offset = { 0, 0 },
 		.extent = state->window.swapchain.imageExtent,
 	};
 	vkCmdSetScissor(state->buffers.commandBuffer[state->renderer.frameIndex], 0, 1, &scissor);
-	vkCmdDrawIndexed(state->buffers.commandBuffer[state->renderer.frameIndex], static_cast<uint32_t>(state->meshes.indices.size()), 1, 0, 0, 0);
+	for (const auto& gameObject : state->scene.gameObjects) {
+		// Bind the descriptor set for this object
+		vkCmdBindDescriptorSets(state->buffers.commandBuffer[state->renderer.frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.pipelineLayout, 0, 1, &gameObject.descriptorSets[state->renderer.frameIndex], 0, nullptr);
+
+		// Draw the object
+		vkCmdDrawIndexed(state->buffers.commandBuffer[state->renderer.frameIndex], static_cast<uint32_t>(state->meshes.indices.size()), 1, 0, 0, 0);
+	};
+
 	vkCmdEndRenderPass(state->buffers.commandBuffer[state->renderer.frameIndex]);
 	PANIC(vkEndCommandBuffer(state->buffers.commandBuffer[state->renderer.frameIndex]), "Failed To Record Command Buffer");
 };

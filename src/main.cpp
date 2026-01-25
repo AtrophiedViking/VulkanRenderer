@@ -8,10 +8,11 @@ int main() {
 			.windowWidth = 800,
 			.windowHeight = 600,
 			.swapchainBuffering = SWAPCHAIN_TRIPPLE_BUFFERING,
+			.MAX_OBJECTS = 3,
 			.backgroundColor = {0.04f,0.015f,0.04f},
 			.msaaSamples = VK_SAMPLE_COUNT_1_BIT,
-			.TEXTURE_PATH = "res/textures/viking_room.png",
-			.MODEL_PATH = "res/models/viking_room.obj",
+			.KOBOLD_TEXTURE_PATH = "res/textures/KoboldSkin.ktx2",
+			.KOBOLD_MODEL_PATH = "res/models/Kobold.glb",
 		}
 	};
 	init(&state);

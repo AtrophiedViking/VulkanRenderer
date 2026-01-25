@@ -1,5 +1,6 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <ktx.h>
 #include "headers/textures.h"
-#include <stb_image.h>
 //Utility
 VkFormat findSupportedFormat(State *state, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {
@@ -60,7 +61,6 @@ void imageCreate(State *state,uint32_t width, uint32_t height, VkFormat format, 
 
     vkBindImageMemory(state->context.device, image, imageMemory, 0);
 }
-
 
 void transitionImageLayout(State* state, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands(state);
@@ -155,13 +155,23 @@ void copyBufferToImage(State *state, VkBuffer buffer, VkImage image, uint32_t wi
 
     endSingleTimeCommands(state, commandBuffer);
 }
-void textureImageCreate(State* state) {
-    //image creation
-    int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(state->config.TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = (uint64_t)texWidth * (uint64_t)texHeight * 4;
+void textureImageCreate(State* state, std::string texturePath) {
+    // Load KTX2 texture instead of using stb_image
+    ktxTexture* kTexture;
+    KTX_error_code result = ktxTexture_CreateFromNamedFile(
+        texturePath.c_str(),
+        KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT,
+        &kTexture);
 
-    PANIC(!pixels, "failed to load texture image!");
+    if (result != KTX_SUCCESS) {
+        throw std::runtime_error("failed to load ktx texture image!");
+    }
+
+    // Get texture dimensions and data
+    uint32_t texWidth = kTexture->baseWidth;
+    uint32_t texHeight = kTexture->baseHeight;
+    ktx_size_t imageSize = ktxTexture_GetImageSize(kTexture, 0);
+    ktx_uint8_t* ktxTextureData = ktxTexture_GetData(kTexture);
 
     state->textures.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
@@ -172,11 +182,12 @@ void textureImageCreate(State* state) {
 
     void* data;
     vkMapMemory(state->context.device, stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    memcpy(data, ktxTextureData, imageSize);
     vkUnmapMemory(state->context.device, stagingBufferMemory);
-    stbi_image_free(pixels);
 
-    imageCreate(state, texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT| VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->textures.textureImage, state->textures.textureImageMemory, state->textures.mipLevels,VK_SAMPLE_COUNT_1_BIT);
+    VkFormat textureFormat = VK_FORMAT_R8G8B8A8_SRGB;
+
+    imageCreate(state, texWidth, texHeight, textureFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT| VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->textures.textureImage, state->textures.textureImageMemory, state->textures.mipLevels,VK_SAMPLE_COUNT_1_BIT);
 
     transitionImageLayout(state, state->textures.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, state->textures.mipLevels);
     copyBufferToImage(state, stagingBuffer, state->textures.textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
@@ -184,6 +195,7 @@ void textureImageCreate(State* state) {
     vkDestroyBuffer(state->context.device, stagingBuffer, nullptr);
     vkFreeMemory(state->context.device, stagingBufferMemory, nullptr);
     generateMipmaps(state, state->textures.textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, state->textures.mipLevels);
+    ktxTexture_Destroy(kTexture);
 };
 void textureImageDestroy(State* state) {
     vkDestroyImage(state->context.device, state->textures.textureImage, nullptr);

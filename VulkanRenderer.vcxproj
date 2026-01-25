@@ -132,8 +132,9 @@
     <ClCompile Include="src\context.cpp" />
     <ClCompile Include="src\gui.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\meshes.cpp" />
+    <ClCompile Include="src\models.cpp" />
     <ClCompile Include="src\renderer.cpp" />
+    <ClCompile Include="src\scene.cpp" />
     <ClCompile Include="src\textures.cpp" />
     <ClCompile Include="src\window.cpp" />
   </ItemGroup>
@@ -142,8 +143,9 @@
     <ClInclude Include="src\headers\buffers.h" />
     <ClInclude Include="src\headers\context.h" />
     <ClInclude Include="src\headers\gui.h" />
-    <ClInclude Include="src\headers\meshes.h" />
+    <ClInclude Include="src\headers\models.h" />
     <ClInclude Include="src\headers\renderer.h" />
+    <ClInclude Include="src\headers\scene.h" />
     <ClInclude Include="src\headers\stateMachine.h" />
     <ClInclude Include="src\headers\textures.h" />
     <ClInclude Include="src\headers\window.h" />

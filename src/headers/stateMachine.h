@@ -1,17 +1,20 @@
 #pragma once
+#define _CRT_SECURE_NO_WARNINGS
 #define GLFW_INCLUDE_VULKAN
-#define STB_IMAGE_IMPLEMENTATION
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan_core.h>
+#include <iostream>
 #include <cstdio>
 #include <cstdlib>
 #include <signal.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/hash.hpp>
+#include <algorithm>
 #include <unordered_map>
 #include <chrono>
 #include <vector>
@@ -75,6 +78,36 @@ struct UniformBufferObject {
 	glm::mat4 proj;
 };
 
+struct GameObject {
+	// Transform properties
+	glm::vec3 position = { 0.0f, 0.0f, 0.0f };
+	glm::vec3 rotation = { 0.0f, 0.0f, 0.0f };
+	glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
+
+	// Uniform buffer for this object (one per frame in flight)
+	std::vector<VkBuffer> uniformBuffers;
+	std::vector<VkDeviceMemory> uniformBuffersMemory;
+	std::vector<void*> uniformBuffersMapped;
+
+	// Descriptor sets for this object (one per frame in flight)
+	std::vector<VkDescriptorSet> descriptorSets;
+
+	// Calculate model matrix based on position, rotation, and scale
+	glm::mat4 getModelMatrix() const {
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, position);
+		model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+		model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::scale(model, scale);
+		return model;
+	}
+};
+	const int objectsMax = 3;
+struct Scene {	
+	std::array<GameObject, objectsMax> gameObjects;
+};
+
 typedef struct {
 	const char* windowTitle;
 	const char* engineName;
@@ -85,12 +118,14 @@ typedef struct {
 	uint32_t engineVersion;
 	uint32_t apiVersion;
 	uint32_t swapchainBuffering;
+	uint32_t MAX_OBJECTS;
 	VkAllocationCallbacks allocator;
 	VkComponentMapping swapchainComponentsMapping;
 	VkClearValue backgroundColor;
 	VkSampleCountFlagBits msaaSamples;
-	const std::string TEXTURE_PATH;
-	const std::string MODEL_PATH;
+	const std::string KOBOLD_TEXTURE_PATH;
+	const std::string KOBOLD_MODEL_PATH;
+
 }Config;
 
 typedef struct {
@@ -136,7 +171,6 @@ typedef struct {
 	VkDeviceMemory indexBufferMemory;
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
-	VkBuffer* uniformBuffers;
 	VkDeviceMemory* uniformBuffersMemory;
 	std::vector<void*> uniformBuffersMapped;
 }Buffers;
@@ -168,7 +202,6 @@ typedef struct {
 	VkRenderPass renderPass;
 	VkCommandPool commandPool;
 	VkDescriptorPool descriptorPool;
-	VkDescriptorSet *descriptorSets;
 	uint32_t imageAquiredIndex;
 	VkSemaphore *imageAvailableSemaphore;
 	VkSemaphore *renderFinishedSemaphore;
@@ -184,6 +217,7 @@ typedef struct {
 	Buffers buffers;
 	Textures textures;
 	Meshes meshes;
+	Scene scene;
 }State;
 
 enum SwapchainBuffering {

@@ -1,5 +1,4 @@
-#include "textures.h"
-#include "meshes.h"
+#include "scene.h"
 #include "fstream"
 #include "vector"
 //Graphics Pipeline
