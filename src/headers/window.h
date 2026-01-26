@@ -35,3 +35,5 @@ void swapchainRecreate(State* state);
 //Draw
 
 void frameDraw(State* state);
+
+void processInput(State* state);

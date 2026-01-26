@@ -129,6 +129,7 @@
   <ItemGroup>
     <ClCompile Include="src\application.cpp" />
     <ClCompile Include="src\buffers.cpp" />
+    <ClCompile Include="src\camera.cpp" />
     <ClCompile Include="src\context.cpp" />
     <ClCompile Include="src\gui.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -141,6 +142,7 @@
   <ItemGroup>
     <ClInclude Include="src\headers\application.h" />
     <ClInclude Include="src\headers\buffers.h" />
+    <ClInclude Include="src\headers\camera.h" />
     <ClInclude Include="src\headers\context.h" />
     <ClInclude Include="src\headers\gui.h" />
     <ClInclude Include="src\headers\models.h" />

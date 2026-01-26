@@ -72,6 +72,98 @@ namespace std {
 	};
 }
 
+enum struct CameraMovement {
+	FORWARD,
+	BACKWARD,
+	LEFT,
+	RIGHT,
+	UP,
+	DOWN
+};
+struct Camera {
+	glm::vec3 front = glm::vec3 (0.0f ,0.0f ,1.0f);   
+	glm::vec3 right = glm:: vec3 (-1.0f,0.0f,0.0f);   
+	glm::vec3 worldUp = glm::vec3 (0.0f, 1.0f, 0.0f);
+	glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);  // Start at world origin
+	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);        // Y-axis as world up
+	float yaw = -90.0f;                                 // Look along negative Z-axis (OpenGL convention)
+	float pitch = 0.0f;
+	float zoom = (100.0f);
+
+	float movementSpeed = 1;    
+	float mouseSensitivity = 0.1f; 
+
+	bool lookMode = true;
+
+	/*glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 6.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 proj = glm::perspective(glm::radians(45.0f), static_cast<float>(state->window.swapchain.imageExtent.width) / static_cast<float>(state->window.swapchain.imageExtent.height),
+		0.1f, 20.0f);*/
+
+	void updateCameraVectors() {
+		// Calculate the new front vector
+		glm::vec3 newFront;
+		newFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+		newFront.y = sin(glm::radians(pitch));
+		newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+		front = glm::normalize(newFront);
+
+		// Recalculate the right and up vectors
+		right = glm::normalize(glm::cross(front, worldUp));
+		up = glm::normalize(glm::cross(right, front));
+	}
+	glm::mat4 getViewMatrix() const {
+		return glm::lookAt(position - front, position, up);
+	};
+	glm::mat4 getProjectionMatrix(float aspectRatio, float nearPlane, float farPlane) const {
+		return glm::perspective(glm::radians(zoom), aspectRatio, nearPlane, farPlane);
+	};
+
+	glm::vec3 getPosition() const { return position; }
+	glm::vec3 getFront() const { return front; }
+	float getZoom() const { return zoom; }
+
+	void processKeyboard(CameraMovement direction, float deltaTime) {
+		float velocity = movementSpeed * deltaTime;
+
+		switch (direction) {
+		case CameraMovement::FORWARD:
+			position += front * velocity;
+			break;
+		case CameraMovement::BACKWARD:
+			position -= front * velocity;
+			break;
+		case CameraMovement::LEFT:
+			position -= right * velocity;
+			break;
+		case CameraMovement::RIGHT:
+			position += right * velocity;
+			break;
+		case CameraMovement::UP:
+			position += up * velocity;
+			break;
+		case CameraMovement::DOWN:
+			position -= up * velocity;
+			break;
+		}
+	}
+	void processMouseMovement(float xOffset, float yOffset, bool constrainPitch) {
+		xOffset *= mouseSensitivity;
+		yOffset *= mouseSensitivity;
+
+		yaw += xOffset;
+		pitch += yOffset;
+
+		// Constrain pitch to avoid flipping
+		if (constrainPitch) {
+			pitch = std::clamp(pitch, -89.0f, 89.0f);
+		}
+
+		// Update camera vectors based on updated Euler angles
+		updateCameraVectors();
+	}
+};
+
+
 struct UniformBufferObject {
 	glm::mat4 model;
 	glm::mat4 view;
@@ -106,6 +198,12 @@ struct GameObject {
 	const int objectsMax = 3;
 struct Scene {	
 	std::array<GameObject, objectsMax> gameObjects;
+	Camera camera;
+};
+
+struct Input {
+	float lastX = 0.0f, lastY = 0.0f;
+	bool firstMouse = true;
 };
 
 typedef struct {

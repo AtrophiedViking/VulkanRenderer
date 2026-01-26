@@ -188,16 +188,15 @@ void uniformBuffersUpdate(State* state) {
 	float time = std::chrono::duration<float>(currentTime - startTime).count();
 
 	// Camera and projection matrices (shared by all objects)
-	glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 6.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::mat4 proj = glm::perspective(glm::radians(45.0f),
-		static_cast<float>(state->window.swapchain.imageExtent.width) / static_cast<float>(state->window.swapchain.imageExtent.height),
+	glm::mat4 view = state->scene.camera.getViewMatrix();
+	glm::mat4 proj = state->scene.camera.getProjectionMatrix(static_cast<float>(state->window.swapchain.imageExtent.width / state->window.swapchain.imageExtent.height),
 		0.1f, 20.0f);
 	proj[1][1] *= -1; // Flip Y for Vulkan
 
 	// Update uniform buffers for each object
 	for (auto& gameObject : state->scene.gameObjects) {
 		// Apply continuous rotation to the object
-		gameObject.rotation.y += 0.001f; // Slow rotation around Y axis
+		gameObject.rotation.y += 0.03f; // Slow rotation around Y axis
 
 		// Get the model matrix for this object
 		glm::mat4 initialRotation = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));

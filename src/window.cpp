@@ -21,6 +21,37 @@ void errorHandlingSetup(State* state) {
 	atexit(exitCallback);
 };
 
+//IO CallBacks
+void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
+
+	auto state = static_cast<State*>(glfwGetWindowUserPointer(window));
+	// State persistence for calculating movement deltas
+	// Static variables maintain state between callback invocations
+	static bool firstMouse = true;          // Flag to handle initial mouse position
+	static float lastX = 0.0f, lastY = 0.0f;  // Previous mouse position for delta calculation
+
+	// Handle initial mouse position to prevent sudden camera jumps
+	// First callback provides absolute position, not relative movement
+	if (firstMouse) {
+		lastX = (float)xpos;               // Initialize previous position
+		lastY = (float)ypos;
+		firstMouse = false;         // Disable special handling for subsequent calls
+	}
+
+	// Calculate mouse movement deltas since last callback
+	// These deltas represent the amount and direction of mouse movement
+	float xoffset = (float)xpos - lastX;                   // Horizontal movement (left-right)
+	float yoffset = lastY - (float)ypos;                   // Vertical movement (inverted: screen Y increases downward, camera pitch increases upward)
+
+	// Update state for next callback iteration
+	lastX = (float)xpos;
+	lastY = (float)ypos;
+
+	// Convert mouse movement to camera rotation
+	// Delta values drive continuous camera orientation changes
+	state->scene.camera.processMouseMovement(xoffset, yoffset, false);
+};
+
 //utility
 static uint32_t clamp(uint32_t value, uint32_t min, uint32_t max){
 	if (value < min) {
@@ -53,7 +84,6 @@ void surfaceDestroy(State* state) {
 void windowCreate(State* state) {
 	initGLFW(state);
 	state->window.handle = glfwCreateWindow(state->config.windowWidth, state->config.windowHeight, state->config.windowTitle, nullptr, nullptr);
-	glfwSetWindowUserPointer(state->window.handle, &state);
 	glfwSetFramebufferSizeCallback(state->window.handle, framebufferResizeCallback);
 	instanceCreate(state);
 	surfaceCreate(state);
@@ -69,6 +99,8 @@ void windowCreate(State* state) {
 	colorResourceCreate(state);
 	depthResourceCreate(state);
 	frameBuffersCreate(state);
+	glfwSetWindowUserPointer(state->window.handle, state);
+	glfwSetCursorPosCallback(state->window.handle, mouseCallback);
 
 	textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
 	textureImageViewCreate(state);
@@ -244,7 +276,6 @@ void frameDraw(State* state) {
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		throw std::runtime_error("failed to present swap chain image!");
 	}
-	uniformBuffersUpdate(state);
 	vkResetFences(state->context.device, 1, &state->renderer.inFlightFence[state->renderer.frameIndex]);
 	vkResetCommandBuffer(state->buffers.commandBuffer[state->renderer.frameIndex],/*VkCommandBufferResetFlagBits*/0);
 	commandBufferRecord(state);
@@ -287,4 +318,41 @@ void frameDraw(State* state) {
 		throw std::runtime_error("failed to present swap chain image!");
 	}
 	state->renderer.frameIndex = (state->renderer.frameIndex + 1) % state->config.swapchainBuffering;
+};
+
+void processInput(State* state) {
+	// Calculate delta time
+	static float lastFrame = 0.0f;
+	float currentFrame = (float)glfwGetTime();
+	float deltaTime = currentFrame - lastFrame;
+	lastFrame = currentFrame;
+
+	// Process keyboard input for camera movement
+	if (glfwGetKey(state->window.handle, GLFW_KEY_W) == GLFW_PRESS)
+		state->scene.camera.processKeyboard(CameraMovement::FORWARD, deltaTime);
+	if (glfwGetKey(state->window.handle, GLFW_KEY_S) == GLFW_PRESS)
+		state->scene.camera.processKeyboard(CameraMovement::BACKWARD, deltaTime);
+	if (glfwGetKey(state->window.handle, GLFW_KEY_A) == GLFW_PRESS)
+		state->scene.camera.processKeyboard(CameraMovement::LEFT, deltaTime);
+	if (glfwGetKey(state->window.handle, GLFW_KEY_D) == GLFW_PRESS)
+		state->scene.camera.processKeyboard(CameraMovement::RIGHT, deltaTime);
+	if (glfwGetKey(state->window.handle, GLFW_KEY_SPACE) == GLFW_PRESS)
+		state->scene.camera.processKeyboard(CameraMovement::UP, deltaTime);
+	if (glfwGetKey(state->window.handle, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+		state->scene.camera.processKeyboard(CameraMovement::DOWN, deltaTime);
+
+
+	//Toggle Mouse
+	static bool previous = false;
+	bool current = glfwGetKey(state->window.handle, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+	if (current && !previous) {
+		state->scene.camera.lookMode = !state->scene.camera.lookMode;
+		glfwSetInputMode(
+			state->window.handle,
+			GLFW_CURSOR,
+			state->scene.camera.lookMode ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
+		);
+	}
+	previous = current;
+
 };
