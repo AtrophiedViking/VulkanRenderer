@@ -124,6 +124,7 @@ void windowDestroy(State* state) {
 	textureImageViewDestroy(state);
 	textureImageDestroy(state);
 	uniformBuffersDestroy(state);
+	descriptorSetsDestroy(state);
 	descriptorPoolDestroy(state);
 	descriptorSetLayoutDestroy(state);
 	indexBufferDestroy(state);
@@ -280,7 +281,7 @@ void frameDraw(State* state) {
 	vkResetCommandBuffer(state->buffers.commandBuffer[state->renderer.frameIndex],/*VkCommandBufferResetFlagBits*/0);
 	commandBufferRecord(state);
 
-
+	
 	VkSemaphore waitSemaphores[] = { state->renderer.imageAvailableSemaphore[state->renderer.frameIndex] };
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	VkSemaphore signalSemaphores[] = { state->renderer.renderFinishedSemaphore[state->renderer.frameIndex] };

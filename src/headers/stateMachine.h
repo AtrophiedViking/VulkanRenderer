@@ -95,10 +95,6 @@ struct Camera {
 
 	bool lookMode = true;
 
-	/*glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 6.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::mat4 proj = glm::perspective(glm::radians(45.0f), static_cast<float>(state->window.swapchain.imageExtent.width) / static_cast<float>(state->window.swapchain.imageExtent.height),
-		0.1f, 20.0f);*/
-
 	void updateCameraVectors() {
 		// Calculate the new front vector
 		glm::vec3 newFront;
@@ -168,9 +164,34 @@ struct UniformBufferObject {
 	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
+
+	glm::vec4 lightPositions[4];  // Position and radius
+	glm::vec4 lightColors[4];     // RGB color and intensity
+	glm::vec4 camPos;             // Camera position for view-dependent effects
+
+	float exposure = 4.5f;         // Exposure for HDR rendering
+	float gamma = 2.2f;            // Gamma correction value
+	float prefilteredCubeMipLevels = 1.0f;  // For image-based lighting
+	float scaleIBLAmbient = 1.0f; // Scale factor for ambient lighting
+};
+
+struct PushConstantBlock {
+	glm::vec4 baseColorFactor;            // RGB base color and alpha
+	float metallicFactor;                 // How metallic the surface is
+	float roughnessFactor;                // How rough the surface is
+	int baseColorTextureSet;              // Texture coordinate set for base color
+	int physicalDescriptorTextureSet;     // Texture coordinate set for metallic-roughness
+	int normalTextureSet;                 // Texture coordinate set for normal map
+	int occlusionTextureSet;              // Texture coordinate set for occlusion
+	int emissiveTextureSet;               // Texture coordinate set for emission
+	float alphaMask;                      // Whether to use alpha masking
+	float alphaMaskCutoff;                // Alpha threshold for masking
 };
 
 struct GameObject {
+
+	float sortKey;  // Key for sorting (e.g., distance to camera)
+
 	// Transform properties
 	glm::vec3 position = { 0.0f, 0.0f, 0.0f };
 	glm::vec3 rotation = { 0.0f, 0.0f, 0.0f };
@@ -183,7 +204,6 @@ struct GameObject {
 
 	// Descriptor sets for this object (one per frame in flight)
 	std::vector<VkDescriptorSet> descriptorSets;
-
 	// Calculate model matrix based on position, rotation, and scale
 	glm::mat4 getModelMatrix() const {
 		glm::mat4 model = glm::mat4(1.0f);

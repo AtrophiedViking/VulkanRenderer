@@ -11,6 +11,7 @@ void mainloop(State *state) {
 		glfwPollEvents();
 		processInput(state);
 
+		gameObjectsSort(state);
 		uniformBuffersUpdate(state);
 
 		frameDraw(state);

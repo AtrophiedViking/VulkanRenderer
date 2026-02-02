@@ -94,17 +94,44 @@ void descriptorSetLayoutCreate(State* state) {
 		.binding = 0,
 		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 		.descriptorCount = 1,
-		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 		.pImmutableSamplers = nullptr, // Optional
 	};
-	VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-	samplerLayoutBinding.binding = 1;
-	samplerLayoutBinding.descriptorCount = 1;
-	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	samplerLayoutBinding.pImmutableSamplers = nullptr;
-	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+	// Bindings for textures
+	std::array<VkDescriptorSetLayoutBinding, 5> textureBindings{};
+	textureBindings[0].binding = 1;
+	textureBindings[0].descriptorCount = 1;
+	textureBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	textureBindings[0].pImmutableSamplers = nullptr;
+	textureBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	textureBindings[1].binding = 2;
+	textureBindings[1].descriptorCount = 1;
+	textureBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	textureBindings[1].pImmutableSamplers = nullptr;
+	textureBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	textureBindings[2].binding = 3;
+	textureBindings[2].descriptorCount = 1;
+	textureBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	textureBindings[2].pImmutableSamplers = nullptr;
+	textureBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	textureBindings[3].binding = 4;
+	textureBindings[3].descriptorCount = 1;
+	textureBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	textureBindings[3].pImmutableSamplers = nullptr;
+	textureBindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	textureBindings[4].binding = 5;
+	textureBindings[4].descriptorCount = 1;
+	textureBindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	textureBindings[4].pImmutableSamplers = nullptr;
+	textureBindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+						
+
+	std::array<VkDescriptorSetLayoutBinding, 6> bindings = { uboLayoutBinding, textureBindings[0], textureBindings[1], textureBindings[2] ,textureBindings[3], textureBindings[4]};
 	VkDescriptorSetLayoutCreateInfo layoutInfo{};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -204,9 +231,9 @@ void graphicsPipelineCreate(State* state) {
 	.depthClampEnable = VK_FALSE,
 	.rasterizerDiscardEnable = VK_FALSE,
 	.polygonMode = VK_POLYGON_MODE_FILL,
-	.cullMode = VK_CULL_MODE_FRONT_BIT,
+	.cullMode = VK_CULL_MODE_NONE,
 	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-	.depthBiasEnable = VK_FALSE,
+	.depthBiasEnable = VK_TRUE,
 	.lineWidth = 1.0f,
 	};
 	//MultiSampling
@@ -221,7 +248,13 @@ void graphicsPipelineCreate(State* state) {
 	};
 	//ColorBlending
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{
-		.blendEnable = VK_FALSE,
+		.blendEnable = VK_TRUE,
+		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
 		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
 	};
 	VkPipelineColorBlendStateCreateInfo colorBlending{
@@ -230,25 +263,29 @@ void graphicsPipelineCreate(State* state) {
 		.attachmentCount = 1,
 		.pAttachments = &colorBlendAttachment,
 	};
+
+	VkPushConstantRange pushConstantRange{
+		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.offset = 0,
+		.size = sizeof(PushConstantBlock),
+	};
 	//PipelineLayout
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount = 1,
 		.pSetLayouts = &state->renderer.descriptorSetLayout,
+		.pushConstantRangeCount = 1,
+		.pPushConstantRanges = &pushConstantRange
 	};
 	PANIC(vkCreatePipelineLayout(state->context.device, &pipelineLayoutInfo, nullptr, &state->renderer.pipelineLayout), "Failed To Create Pipeline Layout");
 	
 	VkPipelineDepthStencilStateCreateInfo depthStencil{};
 	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depthStencil.depthTestEnable = VK_TRUE;
-	depthStencil.depthWriteEnable = VK_TRUE;
+	depthStencil.depthWriteEnable = VK_FALSE;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 	depthStencil.depthBoundsTestEnable = VK_FALSE;
-	depthStencil.minDepthBounds = 0.0f; // Optional
-	depthStencil.maxDepthBounds = 1.0f; // Optional
 	depthStencil.stencilTestEnable = VK_FALSE;
-	depthStencil.front = {}; // Optional
-	depthStencil.back = {}; // Optional
 
 	//GraphicsPipeline
 	VkGraphicsPipelineCreateInfo pipelineInfo{
@@ -296,7 +333,7 @@ void descriptorPoolCreate(State* state) {
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[0].descriptorCount = static_cast<uint32_t>(state->config.swapchainBuffering * objectsMax);
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = static_cast<uint32_t>(state->config.swapchainBuffering * objectsMax);
+	poolSizes[1].descriptorCount = static_cast<uint32_t>(state->config.swapchainBuffering * objectsMax * 5);
 
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -307,51 +344,71 @@ void descriptorPoolCreate(State* state) {
 };
 void descriptorSetsCreate(State* state) {
 	for (auto& gameObject : state->scene.gameObjects) {
-
-
-		std::vector<VkDescriptorSetLayout> layouts(state->config.swapchainBuffering, state->renderer.descriptorSetLayout);
+		// Allocate descriptor sets
+		std::vector<VkDescriptorSetLayout> layouts(
+			state->config.swapchainBuffering,
+			state->renderer.descriptorSetLayout
+		);
 		VkDescriptorSetAllocateInfo allocInfo{
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 			.descriptorPool = state->renderer.descriptorPool,
 			.descriptorSetCount = static_cast<uint32_t>(layouts.size()),
 			.pSetLayouts = layouts.data(),
 		};
-		gameObject.descriptorSets.clear();
 		gameObject.descriptorSets.resize(state->config.swapchainBuffering);
-		vkAllocateDescriptorSets(state->context.device, &allocInfo, &gameObject.descriptorSets[state->renderer.frameIndex]);
+		PANIC(vkAllocateDescriptorSets(state->context.device, &allocInfo, gameObject.descriptorSets.data()), "Failed to allocate descriptor sets!");
+
+		// Update each descriptor set
 		for (size_t i = 0; i < state->config.swapchainBuffering; i++) {
 			VkDescriptorBufferInfo bufferInfo{
 				.buffer = gameObject.uniformBuffers[i],
 				.offset = 0,
 				.range = sizeof(UniformBufferObject),
 			};
+			VkDescriptorImageInfo imageInfo{
+				.sampler = state->textures.textureSampler,
+				.imageView = state->textures.textureImageView,
+				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+			};
 
-			VkDescriptorImageInfo imageInfo{};
-			imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			imageInfo.imageView = state->textures.textureImageView;
-			imageInfo.sampler = state->textures.textureSampler;
+			//Binding writes
+			std::array<VkWriteDescriptorSet, 6> writes{};
+			// Binding 0: UBO
+			writes[0] = {
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.dstSet = gameObject.descriptorSets[i],
+				.dstBinding = 0,
+				.descriptorCount = 1,
+				.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.pBufferInfo = &bufferInfo
+			};
 
-			std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+			// Bindings 1–5: textures
+			for (uint32_t b = 1; b <= 5; b++) {
+				writes[b] = {
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = gameObject.descriptorSets[i],
+					.dstBinding = b,
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+					.pImageInfo = &imageInfo
+				};
+			}
 
-			descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWrites[0].dstSet = gameObject.descriptorSets[i];
-			descriptorWrites[0].dstBinding = 0;
-			descriptorWrites[0].dstArrayElement = 0;
-			descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			descriptorWrites[0].descriptorCount = 1;
-			descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-			descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWrites[1].dstSet = gameObject.descriptorSets[i];
-			descriptorWrites[1].dstBinding = 1;
-			descriptorWrites[1].dstArrayElement = 0;
-			descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			descriptorWrites[1].descriptorCount = 1;
-			descriptorWrites[1].pImageInfo = &imageInfo;
-
-			vkUpdateDescriptorSets(state->context.device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+			vkUpdateDescriptorSets(
+				state->context.device,
+				static_cast<uint32_t>(writes.size()),
+				writes.data(),
+				0,
+				nullptr
+			);
 		};
 	};
+};
+void descriptorSetsDestroy(State* state) {
+	for (auto& gameObject : state->scene.gameObjects) {
+		gameObject.descriptorSets.clear();
+	}
 };
 void descriptorPoolDestroy(State* state) {
 	vkDestroyDescriptorPool(state->context.device, state->renderer.descriptorPool, nullptr);

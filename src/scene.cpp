@@ -15,3 +15,18 @@ void gameObjectsCreate(State* state) {
     state->scene.gameObjects[2].rotation = { 0.0f, glm::radians(-45.0f), 0.0f };
     state->scene.gameObjects[2].scale = { 0.75f, 0.75f, 0.75f };
 }
+
+void gameObjectsSort(State* state) {
+	for (auto& gameObject : state->scene.gameObjects) {
+        glm::vec3 toCamera = state->scene.camera.position - gameObject.position;
+        gameObject.sortKey = (float)glm::length(toCamera);  
+    }
+    std::sort(
+        state->scene.gameObjects.begin(),
+        state->scene.gameObjects.end(),
+        [](const GameObject& a, const GameObject& b) {
+            return a.sortKey > b.sortKey; // far → near
+        }
+    );
+}
+

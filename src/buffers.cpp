@@ -196,7 +196,7 @@ void uniformBuffersUpdate(State* state) {
 	// Update uniform buffers for each object
 	for (auto& gameObject : state->scene.gameObjects) {
 		// Apply continuous rotation to the object
-		gameObject.rotation.y += 0.03f; // Slow rotation around Y axis
+		gameObject.rotation.y += 0.01f; // Slow rotation around Y axis
 
 		// Get the model matrix for this object
 		glm::mat4 initialRotation = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -208,6 +208,33 @@ void uniformBuffersUpdate(State* state) {
 			.view = view,
 			.proj = proj
 		};
+
+		// Set up lights
+		// Light 1: White light from above
+		ubo.lightPositions[0] = glm::vec4(0.0f, 5.0f, 5.0f, 1.0f);
+		ubo.lightColors[0] = glm::vec4(300.0f, 300.0f, 300.0f, 1.0f);
+
+		// Light 2: Blue light from the left
+		ubo.lightPositions[1] = glm::vec4(-5.0f, 0.0f, 0.0f, 1.0f);
+		ubo.lightColors[1] = glm::vec4(0.0f, 0.0f, 300.0f, 1.0f);
+
+		// Light 3: Red light from the right
+		ubo.lightPositions[2] = glm::vec4(5.0f, 0.0f, 0.0f, 1.0f);
+		ubo.lightColors[2] = glm::vec4(300.0f, 0.0f, 0.0f, 1.0f);
+
+		// Light 4: Green light from behind
+		ubo.lightPositions[3] = glm::vec4(0.0f, -5.0f, 0.0f, 1.0f);
+		ubo.lightColors[3] = glm::vec4(0.0f, 300.0f, 0.0f, 1.0f);
+
+		// Set camera position for view-dependent effects
+		ubo.camPos = glm::vec4(state->scene.camera.getPosition(),1.0f);
+
+		// Set PBR parameters
+		ubo.exposure = 4.5f;
+		ubo.gamma = 2.2f;
+		ubo.prefilteredCubeMipLevels = 1.0f;
+		ubo.scaleIBLAmbient = 1.0f;
+
 
 		// Copy the UBO data to the mapped memory
 		memcpy(gameObject.uniformBuffersMapped[state->renderer.frameIndex], &ubo, sizeof(ubo));
@@ -273,6 +300,28 @@ void commandBufferRecord(State* state) {
 		.extent = state->window.swapchain.imageExtent,
 	};
 	vkCmdSetScissor(state->buffers.commandBuffer[state->renderer.frameIndex], 0, 1, &scissor);
+
+	PushConstantBlock pc{};
+	pc.baseColorFactor = glm::vec4(1.0f);
+	pc.metallicFactor = 1.0f;
+	pc.roughnessFactor = 1.0f;
+	pc.baseColorTextureSet = 0;
+	pc.physicalDescriptorTextureSet = 0;
+	pc.normalTextureSet = 0;
+	pc.occlusionTextureSet = 0;
+	pc.emissiveTextureSet = 0;
+	pc.alphaMask = 0.0f;
+	pc.alphaMaskCutoff = 0.5f;
+
+	vkCmdPushConstants(state->buffers.commandBuffer[state->renderer.frameIndex],
+		state->renderer.pipelineLayout,
+		VK_SHADER_STAGE_FRAGMENT_BIT, // must match pcRange.stageFlags
+		0,
+		sizeof(PushConstantBlock),
+		&pc
+	);
+
+
 	for (const auto& gameObject : state->scene.gameObjects) {
 		// Bind the descriptor set for this object
 		vkCmdBindDescriptorSets(state->buffers.commandBuffer[state->renderer.frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.pipelineLayout, 0, 1, &gameObject.descriptorSets[state->renderer.frameIndex], 0, nullptr);
