@@ -87,8 +87,8 @@ void frameBuffersCreate(State* state) {
 
 	for (int i = 0; i < (int)frameBufferCount; i++) {
 		std::array<VkImageView, 3> attachments = {
-			state->textures.colorImageView,
-			state->textures.depthImageView,
+			state->texture.colorImageView,
+			state->texture.depthImageView,
 			state->window.swapchain.imageViews[i]
 		};
 
@@ -113,7 +113,7 @@ void frameBuffersDestroy(State* state) {
 };
 
 void vertexBufferCreate(State* state) {
-	VkDeviceSize bufferSize = sizeof(state->meshes.vertices[0]) * state->meshes.vertices.size();
+	VkDeviceSize bufferSize = sizeof(state->mesh.vertices[0]) * state->mesh.vertices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -121,7 +121,7 @@ void vertexBufferCreate(State* state) {
 
 	void* data;
 	vkMapMemory(state->context.device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, state->meshes.vertices.data(), (size_t)bufferSize);
+	memcpy(data, state->mesh.vertices.data(), (size_t)bufferSize);
 	vkUnmapMemory(state->context.device, stagingBufferMemory);
 
 
@@ -137,7 +137,7 @@ void vertexBufferDestroy(State* state) {
 };
 
 void indexBufferCreate(State* state) {
-	VkDeviceSize bufferSize = sizeof(state->meshes.indices[0]) * state->meshes.indices.size();
+	VkDeviceSize bufferSize = sizeof(state->mesh.indices[0]) * state->mesh.indices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -145,7 +145,7 @@ void indexBufferCreate(State* state) {
 
 	void* data;
 	vkMapMemory(state->context.device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, state->meshes.indices.data(), (size_t)bufferSize);
+	memcpy(data, state->mesh.indices.data(), (size_t)bufferSize);
 	vkUnmapMemory(state->context.device, stagingBufferMemory);
 
 	createBuffer(state, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->buffers.indexBuffer, state->buffers.indexBufferMemory);
@@ -196,7 +196,7 @@ void uniformBuffersUpdate(State* state) {
 	// Update uniform buffers for each object
 	for (auto& gameObject : state->scene.gameObjects) {
 		// Apply continuous rotation to the object
-		gameObject.rotation.y += 0.01f; // Slow rotation around Y axis
+		gameObject.rotation.y += 0.005f; // Slow rotation around Y axis
 
 		// Get the model matrix for this object
 		glm::mat4 initialRotation = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -300,35 +300,30 @@ void commandBufferRecord(State* state) {
 		.extent = state->window.swapchain.imageExtent,
 	};
 	vkCmdSetScissor(state->buffers.commandBuffer[state->renderer.frameIndex], 0, 1, &scissor);
-
-	PushConstantBlock pc{};
-	pc.baseColorFactor = glm::vec4(1.0f);
-	pc.metallicFactor = 1.0f;
-	pc.roughnessFactor = 1.0f;
-	pc.baseColorTextureSet = 0;
-	pc.physicalDescriptorTextureSet = 0;
-	pc.normalTextureSet = 0;
-	pc.occlusionTextureSet = 0;
-	pc.emissiveTextureSet = 0;
-	pc.alphaMask = 0.0f;
-	pc.alphaMaskCutoff = 0.5f;
+	
+	PushConstantBlock pushConstants{};
+		pushConstants.baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f};
+		pushConstants.metallicFactor = 1.0f;
+		pushConstants.roughnessFactor = 0.5f;
+		pushConstants.baseColorTextureSet = 0;
+		pushConstants.physicalDescriptorTextureSet = 1;
+		pushConstants.normalTextureSet = 2;
+		pushConstants.occlusionTextureSet = 3;
+		pushConstants.emissiveTextureSet = 4;
+		pushConstants.alphaMask = 0.0f;
+		pushConstants.alphaMaskCutoff = 0.5f;
 
 	vkCmdPushConstants(state->buffers.commandBuffer[state->renderer.frameIndex],
 		state->renderer.pipelineLayout,
 		VK_SHADER_STAGE_FRAGMENT_BIT, // must match pcRange.stageFlags
 		0,
 		sizeof(PushConstantBlock),
-		&pc
+		&pushConstants
 	);
 
 
-	for (const auto& gameObject : state->scene.gameObjects) {
-		// Bind the descriptor set for this object
-		vkCmdBindDescriptorSets(state->buffers.commandBuffer[state->renderer.frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.pipelineLayout, 0, 1, &gameObject.descriptorSets[state->renderer.frameIndex], 0, nullptr);
+	drawNode(state, state->buffers.commandBuffer[state->renderer.frameIndex], state->scene.rootNode);
 
-		// Draw the object
-		vkCmdDrawIndexed(state->buffers.commandBuffer[state->renderer.frameIndex], static_cast<uint32_t>(state->meshes.indices.size()), 1, 0, 0, 0);
-	};
 
 	vkCmdEndRenderPass(state->buffers.commandBuffer[state->renderer.frameIndex]);
 	PANIC(vkEndCommandBuffer(state->buffers.commandBuffer[state->renderer.frameIndex]), "Failed To Record Command Buffer");

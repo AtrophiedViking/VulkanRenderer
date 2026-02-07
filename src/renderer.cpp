@@ -366,8 +366,8 @@ void descriptorSetsCreate(State* state) {
 				.range = sizeof(UniformBufferObject),
 			};
 			VkDescriptorImageInfo imageInfo{
-				.sampler = state->textures.textureSampler,
-				.imageView = state->textures.textureImageView,
+				.sampler = state->texture.textureSampler,
+				.imageView = state->texture.textureImageView,
 				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			};
 

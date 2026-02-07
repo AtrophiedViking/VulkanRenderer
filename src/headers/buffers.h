@@ -1,5 +1,6 @@
 #pragma once
 #include "stateMachine.h"
+#include "models.h"
 //Utility
 uint32_t findMemoryType(State* state, VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties);
 //Buffers

@@ -109,7 +109,7 @@ void main()
     color *= occlusion;
 
     // Gamma correction
-    color = pow(color, vec3(1.0 / ubo.gamma));
+    color = pow(color * baseColor.a, vec3(1.0 / ubo.gamma));
 
     outColor = vec4(color, baseColor.a);
 }

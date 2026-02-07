@@ -8,7 +8,7 @@ void logPrint(State* state) {
 	uint32_t apiVersionMinor = VK_API_VERSION_MINOR(instanceApiVersion);
 	uint32_t apiVersionPatch = VK_API_VERSION_PATCH(instanceApiVersion);
 	printf("Vulkan API %i.%i.%i.%i\n", apiVersionVarient, apiVersionMajor, apiVersionMinor, apiVersionPatch);
-	printf("GLFW %s\n", glfwGetVersionString());
+	printf("GLFW %s\n\n", glfwGetVersionString());
 };
 void exitCallback() {
 	glfwTerminate();
@@ -102,12 +102,8 @@ void windowCreate(State* state) {
 	glfwSetWindowUserPointer(state->window.handle, state);
 	glfwSetCursorPosCallback(state->window.handle, mouseCallback);
 
-	textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
-	textureImageViewCreate(state);
-	textureSamplerCreate(state);
-
 	modelLoad(state, state->config.KOBOLD_MODEL_PATH);
-	gameObjectsCreate(state);
+	gameObjectsCreate(state, "");
 
 	vertexBufferCreate(state);
 	indexBufferCreate(state);

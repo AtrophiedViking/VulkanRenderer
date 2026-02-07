@@ -25,8 +25,10 @@
 
 struct Vertex {
 	glm::vec3 pos;
+	glm::vec3 normal;
 	glm::vec3 color;
 	glm::vec2 texCoord;
+	uint32_t  materialIndex;
 
 	static VkVertexInputBindingDescription getBindingDescription() {
 		VkVertexInputBindingDescription bindingDescription{};
@@ -159,7 +161,6 @@ struct Camera {
 	}
 };
 
-
 struct UniformBufferObject {
 	glm::mat4 model;
 	glm::mat4 view;
@@ -188,8 +189,158 @@ struct PushConstantBlock {
 	float alphaMaskCutoff;                // Alpha threshold for masking
 };
 
-struct GameObject {
+struct Material {
+	glm::vec4 baseColorFactor = glm::vec4(1.0f);
+	float metallicFactor = 1.0f;
+	float roughnessFactor = 1.0f;
+	glm::vec3 emissiveFactor = glm::vec3(0.0f);
 
+	int baseColorTextureIndex = -1;
+	int metallicRoughnessTextureIndex = -1;
+	int normalTextureIndex = -1;
+	int occlusionTextureIndex = -1;
+	int emissiveTextureIndex = -1;
+};
+
+struct Mesh {
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+
+	VkBuffer vertexBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
+
+	VkBuffer indexBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory indexMemory = VK_NULL_HANDLE;
+
+	int materialIndex = -1;
+};
+
+
+struct Node {
+	std::string name;
+	Node* parent = nullptr;
+	std::vector<Node*> children;
+	std::vector<Mesh>meshes;
+	glm::mat4 matrix = glm::mat4(1.0f);
+
+	// For animation
+	glm::vec3 translation = glm::vec3(0.0f);
+	glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+	glm::vec3 scale = glm::vec3(1.0f);
+
+	glm::mat4 getLocalMatrix() const {
+		return glm::translate(glm::mat4(1.0f), translation) *
+			glm::toMat4(rotation) *
+			glm::scale(glm::mat4(1.0f), scale) *
+			matrix;
+	};
+
+	glm::mat4 getGlobalMatrix() const {
+		glm::mat4 m = getLocalMatrix();
+		Node* p = parent;
+		while (p) {
+			m = p->getLocalMatrix() * m;
+			p = p->parent;
+		}
+		return m;
+	}
+};
+
+// Structure for animation keyframes
+struct AnimationChannel {
+	enum PathType { TRANSLATION, ROTATION, SCALE };
+	PathType path;
+	Node* node = nullptr;
+	uint32_t samplerIndex;
+};
+
+// Structure for animation interpolation
+struct AnimationSampler {
+	enum InterpolationType { LINEAR, STEP, CUBICSPLINE };
+	InterpolationType interpolation;
+	std::vector<float> inputs;  // Key frame timestamps
+	std::vector<glm::vec4> outputsVec4;  // Key frame values (for rotations)
+	std::vector<glm::vec3> outputsVec3;  // Key frame values (for translations and scales)
+};
+
+// Structure for animation
+struct Animation {
+	std::string name;
+	std::vector<AnimationSampler> samplers;
+	std::vector<AnimationChannel> channels;
+	float start = std::numeric_limits<float>::max();
+	float end = std::numeric_limits<float>::min();
+	float currentTime = 0.0f;
+};
+
+struct Model {
+	std::string name;
+	std::vector<Node*> nodes;
+	std::vector<Node*> linearNodes;
+	std::vector<Animation> animations;
+
+	~Model() {
+		for (auto node : linearNodes) {
+			delete node;
+		}
+	}
+
+	Node* findNode(const std::string& name) {
+		auto nodeIt = std::ranges::find_if(linearNodes, [&name](auto const& node) {
+			return node->name == name;
+			});
+		return (nodeIt != linearNodes.end()) ? *nodeIt : nullptr;
+	}
+
+	void updateAnimation(uint32_t index, float deltaTime) {
+		assert(!animations.empty() && index < animations.size());
+
+
+
+		Animation& animation = animations[index];
+		animation.currentTime += deltaTime;
+		if (animation.currentTime > animation.end) {
+			animation.currentTime = animation.start;
+		}
+
+		for (auto& channel : animation.channels) {
+			AnimationSampler& sampler = animation.samplers[channel.samplerIndex];
+
+			// Find the current key frame using binary search
+			auto keyFrameIt = std::ranges::lower_bound(sampler.inputs, animation.currentTime);
+			if (keyFrameIt != sampler.inputs.end() && keyFrameIt != sampler.inputs.begin()) {
+				size_t i = std::distance(sampler.inputs.begin(), keyFrameIt) - 1;
+				float t = (animation.currentTime - sampler.inputs[i]) / (sampler.inputs[i + 1] - sampler.inputs[i]);
+
+				switch (channel.path) {
+				case AnimationChannel::TRANSLATION: {
+					glm::vec3 start = sampler.outputsVec3[i];
+					glm::vec3 end = sampler.outputsVec3[i + 1];
+					channel.node->translation = glm::mix(start, end, t);
+					break;
+				}
+				case AnimationChannel::ROTATION: {
+					glm::quat start = glm::quat(sampler.outputsVec4[i].w, sampler.outputsVec4[i].x, sampler.outputsVec4[i].y, sampler.outputsVec4[i].z);
+					glm::quat end = glm::quat(sampler.outputsVec4[i + 1].w, sampler.outputsVec4[i + 1].x, sampler.outputsVec4[i + 1].y, sampler.outputsVec4[i + 1].z);
+					channel.node->rotation = glm::slerp(start, end, t);
+					break;
+				}
+				case AnimationChannel::SCALE: {
+					glm::vec3 start = sampler.outputsVec3[i];
+					glm::vec3 end = sampler.outputsVec3[i + 1];
+					channel.node->scale = glm::mix(start, end, t);
+					break;
+				}
+				}
+				break;
+			}
+		}
+	}
+};
+
+struct GameObject {
+	std::string name;
+	std::vector<Model> models;
 	float sortKey;  // Key for sorting (e.g., distance to camera)
 
 	// Transform properties
@@ -215,8 +366,38 @@ struct GameObject {
 		return model;
 	}
 };
-	const int objectsMax = 3;
-struct Scene {	
+
+
+
+
+
+
+typedef struct {
+	std::string name;
+	VkImage textureImage;
+	VkDeviceMemory textureImageMemory;
+	VkImageView textureImageView;
+	VkSampler textureSampler;
+
+	VkImage depthImage;
+	VkDeviceMemory depthImageMemory;
+	VkImageView depthImageView;
+	uint32_t mipLevels;
+
+	VkImage colorImage;
+	VkDeviceMemory colorImageMemory;
+	VkImageView colorImageView;
+
+	VkDescriptorSet descriptorSet;
+
+}Texture;
+
+const int objectsMax = 3;
+struct Scene {
+	Node* rootNode = nullptr;
+
+	std::vector<Texture> textures;
+	std::vector<Material> materials;
 	std::array<GameObject, objectsMax> gameObjects;
 	Camera camera;
 };
@@ -294,26 +475,6 @@ typedef struct {
 }Buffers;
 
 typedef struct {
-	VkImage textureImage;
-	VkDeviceMemory textureImageMemory;
-	VkImageView textureImageView;
-	VkSampler textureSampler;
-	VkImage depthImage;
-	VkDeviceMemory depthImageMemory;
-	VkImageView depthImageView;
-	uint32_t mipLevels;
-
-	VkImage colorImage;
-	VkDeviceMemory colorImageMemory;
-	VkImageView colorImageView;
-}Textures;
-
-typedef struct {
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-}Meshes;
-
-typedef struct {
 	VkPipeline graphicsPipeline;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
@@ -333,9 +494,9 @@ typedef struct {
 	Context context;
 	Renderer renderer;
 	Buffers buffers;
-	Textures textures;
-	Meshes meshes;
 	Scene scene;
+	Texture texture;
+	Mesh mesh;
 }State;
 
 enum SwapchainBuffering {

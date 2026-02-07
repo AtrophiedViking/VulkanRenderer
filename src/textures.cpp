@@ -173,7 +173,7 @@ void textureImageCreate(State* state, std::string texturePath) {
     ktx_size_t imageSize = ktxTexture_GetImageSize(kTexture, 0);
     ktx_uint8_t* ktxTextureData = ktxTexture_GetData(kTexture);
 
-    state->textures.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+    state->texture.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -187,19 +187,19 @@ void textureImageCreate(State* state, std::string texturePath) {
 
     VkFormat textureFormat = VK_FORMAT_R8G8B8A8_SRGB;
 
-    imageCreate(state, texWidth, texHeight, textureFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT| VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->textures.textureImage, state->textures.textureImageMemory, state->textures.mipLevels,VK_SAMPLE_COUNT_1_BIT);
+    imageCreate(state, texWidth, texHeight, textureFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT| VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->texture.textureImage, state->texture.textureImageMemory, state->texture.mipLevels,VK_SAMPLE_COUNT_1_BIT);
 
-    transitionImageLayout(state, state->textures.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, state->textures.mipLevels);
-    copyBufferToImage(state, stagingBuffer, state->textures.textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+    transitionImageLayout(state, state->texture.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, state->texture.mipLevels);
+    copyBufferToImage(state, stagingBuffer, state->texture.textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
     //transitionImageLayout(state, state->textures.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,state->textures.mipLevels);
     vkDestroyBuffer(state->context.device, stagingBuffer, nullptr);
     vkFreeMemory(state->context.device, stagingBufferMemory, nullptr);
-    generateMipmaps(state, state->textures.textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, state->textures.mipLevels);
+    generateMipmaps(state, state->texture.textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, state->texture.mipLevels);
     ktxTexture_Destroy(kTexture);
 };
 void textureImageDestroy(State* state) {
-    vkDestroyImage(state->context.device, state->textures.textureImage, nullptr);
-    vkFreeMemory(state->context.device, state->textures.textureImageMemory, nullptr);
+    vkDestroyImage(state->context.device, state->texture.textureImage, nullptr);
+    vkFreeMemory(state->context.device, state->texture.textureImageMemory, nullptr);
 };
 
 VkImageView imageViewCreate(State *state, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels) {
@@ -221,10 +221,10 @@ VkImageView imageViewCreate(State *state, VkImage image, VkFormat format, VkImag
 };
 
 void textureImageViewCreate(State* state) {
-    state->textures.textureImageView = imageViewCreate(state, state->textures.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, state->textures.mipLevels);
+    state->texture.textureImageView = imageViewCreate(state, state->texture.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, state->texture.mipLevels);
 };
 void textureImageViewDestroy(State* state) {
-    vkDestroyImageView(state->context.device, state->textures.textureImageView, nullptr);
+    vkDestroyImageView(state->context.device, state->texture.textureImageView, nullptr);
 };
 
 void textureSamplerCreate(State* state) {
@@ -248,33 +248,33 @@ void textureSamplerCreate(State* state) {
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
 
-    PANIC(vkCreateSampler(state->context.device, &samplerInfo, nullptr, &state->textures.textureSampler), "failed to create texture sampler!");
+    PANIC(vkCreateSampler(state->context.device, &samplerInfo, nullptr, &state->texture.textureSampler), "failed to create texture sampler!");
 };
 void textureSamplerDestroy(State* state) {
-    vkDestroySampler(state->context.device, state->textures.textureSampler, nullptr);
+    vkDestroySampler(state->context.device, state->texture.textureSampler, nullptr);
 };
 void colorResourceCreate(State* state) {
     VkFormat colorFormat = state->window.swapchain.format;
 
-    imageCreate(state, state->window.swapchain.imageExtent.width, state->window.swapchain.imageExtent.height, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->textures.colorImage, state->textures.colorImageMemory, 1, state->config.msaaSamples);
-    state->textures.colorImageView = imageViewCreate(state, state->textures.colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+    imageCreate(state, state->window.swapchain.imageExtent.width, state->window.swapchain.imageExtent.height, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->texture.colorImage, state->texture.colorImageMemory, 1, state->config.msaaSamples);
+    state->texture.colorImageView = imageViewCreate(state, state->texture.colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
 }
 void colorResourceDestroy(State* state) {
-    vkDestroyImageView(state->context.device, state->textures.colorImageView, nullptr);
-    vkDestroyImage(state->context.device, state->textures.colorImage, nullptr);
-    vkFreeMemory(state->context.device, state->textures.colorImageMemory, nullptr);
+    vkDestroyImageView(state->context.device, state->texture.colorImageView, nullptr);
+    vkDestroyImage(state->context.device, state->texture.colorImage, nullptr);
+    vkFreeMemory(state->context.device, state->texture.colorImageMemory, nullptr);
 };
 
 void depthResourceCreate(State* state) {
     VkFormat depthFormat = findDepthFormat(state);
-    imageCreate(state, state->window.swapchain.imageExtent.width, state->window.swapchain.imageExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->textures.depthImage, state->textures.depthImageMemory, 1, state->config.msaaSamples);
-    state->textures.depthImageView = imageViewCreate(state, state->textures.depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
-    transitionImageLayout(state, state->textures.depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
+    imageCreate(state, state->window.swapchain.imageExtent.width, state->window.swapchain.imageExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->texture.depthImage, state->texture.depthImageMemory, 1, state->config.msaaSamples);
+    state->texture.depthImageView = imageViewCreate(state, state->texture.depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
+    transitionImageLayout(state, state->texture.depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
 };
 void depthBufferDestroy(State* state) {
-    vkDestroyImageView(state->context.device, state->textures.depthImageView, nullptr);
-    vkDestroyImage(state->context.device, state->textures.depthImage, nullptr);
-    vkFreeMemory(state->context.device, state->textures.depthImageMemory, nullptr);
+    vkDestroyImageView(state->context.device, state->texture.depthImageView, nullptr);
+    vkDestroyImage(state->context.device, state->texture.depthImage, nullptr);
+    vkFreeMemory(state->context.device, state->texture.depthImageMemory, nullptr);
 };
 
 void generateMipmaps(State *state, VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
