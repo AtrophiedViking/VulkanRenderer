@@ -9,11 +9,13 @@ void init(State *state) {
 void mainloop(State *state) {
 	while (!glfwWindowShouldClose(state->window.handle)) {
 		glfwPollEvents();
+		updateFPS(state);
 		processInput(state);
 
 		uniformBuffersUpdate(state);
 
 		frameDraw(state);
+
 	};
 		vkDeviceWaitIdle(state->context.device);
 };

@@ -65,7 +65,7 @@ void imageCreate(State *state,uint32_t width, uint32_t height, VkFormat format, 
 }
 
 void transitionImageLayout(State* state, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(state);
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands(state, state->renderer.commandPool);
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -126,8 +126,47 @@ void transitionImageLayout(State* state, VkImage image, VkFormat format, VkImage
 
     endSingleTimeCommands(state, commandBuffer);
 }
+void transitionSwapchainImagesToPresent(State* state) {
+    VkCommandBuffer cmd = beginSingleTimeCommands(state, state->renderer.commandPool);
+
+    std::vector<VkImageMemoryBarrier> barriers;
+    barriers.reserve(state->window.swapchain.images.size());
+
+    for (VkImage image : state->window.swapchain.images) {
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = 0;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = image;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        barriers.push_back(barrier);
+    }
+
+    vkCmdPipelineBarrier(
+        cmd,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        static_cast<uint32_t>(barriers.size()),
+        barriers.data()
+    );
+
+    endSingleTimeCommands(state, cmd);
+}
+
 void copyBufferToImage(State *state, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(state);
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands(state,state->renderer.commandPool);
 
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
@@ -295,7 +334,7 @@ void generateMipmaps(State *state, VkImage image, VkFormat imageFormat, int32_t 
         throw std::runtime_error("texture image format does not support linear blitting!");
     }
 
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(state);
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands(state, state->renderer.commandPool);
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;

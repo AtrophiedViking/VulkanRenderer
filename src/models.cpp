@@ -430,3 +430,21 @@ void drawNode(State* state, VkCommandBuffer cmd, const Node* node) {
     }
 }
 
+
+void gatherDrawItems(const Node* node,
+	const glm::vec3& camPos,
+	std::vector<DrawItem>& out)
+{
+	glm::mat4 model = node->getGlobalMatrix();
+	glm::vec3 worldPos = glm::vec3(model[3]); // extract translation
+
+	float dist = glm::length(worldPos - camPos);
+
+	for (const Mesh& mesh : node->meshes) {
+		out.push_back({ node, &mesh, dist });
+	}
+
+	for (const Node* child : node->children) {
+		gatherDrawItems(child, camPos, out);
+	}
+}

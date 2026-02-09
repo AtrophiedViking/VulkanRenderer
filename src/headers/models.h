@@ -9,3 +9,7 @@ void createTextureDescriptorSets(State* state);
 void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh);
 
 void drawNode(State* state, VkCommandBuffer cmd, const Node* node);
+
+void gatherDrawItems(const Node* node,
+	const glm::vec3& camPos,
+	std::vector<DrawItem>& out);

@@ -1,6 +1,7 @@
 #include "context.h"
 #include "renderer.h"
 
+
 //Error Handling
 void logPrint(State* state);
 void exitCallback();
@@ -36,4 +37,5 @@ void swapchainRecreate(State* state);
 
 void frameDraw(State* state);
 
+void updateFPS(State* state);
 void processInput(State* state);

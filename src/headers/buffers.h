@@ -1,12 +1,13 @@
 #pragma once
 #include "stateMachine.h"
 #include "models.h"
+#include "gui.h"
 //Utility
 uint32_t findMemoryType(State* state, VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties);
 //Buffers
 void createBuffer(State* state, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 
-VkCommandBuffer beginSingleTimeCommands(State* state);
+VkCommandBuffer beginSingleTimeCommands(State* state, VkCommandPool commandPool);
 void endSingleTimeCommands(State* state, VkCommandBuffer commandBuffer);
 void copyBuffer(State* state, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 

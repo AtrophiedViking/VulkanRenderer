@@ -19,15 +19,18 @@
 #include <chrono>
 #include <vector>
 #include <array>
-
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_vulkan.h"
 
 #define PANIC(ERROR, FORMAT,...){int macroErrorCode = ERROR; if(macroErrorCode){fprintf(stderr, "%s -> %s -> %i -> Error(%i):\n\t" FORMAT "\n", __FILE__, __func__, __LINE__, macroErrorCode, ##__VA_ARGS__); raise(SIGABRT);}};
 
 struct Vertex {
 	glm::vec3 pos;
-	glm::vec3 normal;
 	glm::vec3 color;
 	glm::vec2 texCoord;
+	glm::vec3 normal;
+	glm::vec4 tangent;
 	uint32_t  materialIndex;
 
 	static VkVertexInputBindingDescription getBindingDescription() {
@@ -39,8 +42,8 @@ struct Vertex {
 		return bindingDescription;
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-		std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+	static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions() {
+		std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions{};
 
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
@@ -56,6 +59,16 @@ struct Vertex {
 		attributeDescriptions[2].location = 2;
 		attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
 		attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
+		attributeDescriptions[3].binding = 0;
+		attributeDescriptions[3].location = 3;
+		attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[3].offset = offsetof(Vertex, normal);
+
+		attributeDescriptions[4].binding = 0;
+		attributeDescriptions[4].location = 4;
+		attributeDescriptions[4].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[4].offset = offsetof(Vertex, tangent);
 
 		return attributeDescriptions;
 
@@ -357,9 +370,16 @@ typedef struct {
 
 }Texture;
 
+struct DrawItem {
+	const Node* node;
+	const Mesh* mesh;
+	float distanceToCamera;
+
+	
+};
+
 struct Scene {
 	Node* rootNode = nullptr;
-
 
 	std::vector<Texture> textures;
 	std::vector<Material> materials;
@@ -403,14 +423,22 @@ typedef struct {
 }Context;
 
 typedef struct {
-
+	VkDescriptorPool descriptorPool;
+	VkRenderPass renderPass;
+	VkDescriptorSet descriptorSet;
+	VkPipelineLayout pipelineLayout;
+	VkPipeline pipeline;
+	ImGuiIO io;
+	ImGuiStyle style;
+	VkCommandBuffer cmd;
+	std::vector<VkFramebuffer> framebuffers;
 }Gui;
 
 typedef struct {
 	VkSwapchainKHR handle;
 
 	uint32_t imageCount;
-	VkImage* images;
+	std::vector<VkImage> images;
 	VkImageView *imageViews;
 
 	VkFormat format;
@@ -421,6 +449,7 @@ typedef struct {
 typedef struct {
 	GLFWwindow *handle;
 	VkSurfaceKHR surface;
+	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	Swapchain swapchain;
 	bool framebufferResized;
 }Window;
@@ -469,6 +498,7 @@ typedef struct {
 	Scene scene;
 	Texture texture;
 	Mesh mesh;
+	Gui gui;
 }State;
 
 enum SwapchainBuffering {

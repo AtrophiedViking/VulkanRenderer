@@ -37,11 +37,11 @@ void createBuffer(State* state, VkDeviceSize size, VkBufferUsageFlags usage, VkM
 
 	vkBindBufferMemory(state->context.device, buffer, bufferMemory, 0);
 }
-VkCommandBuffer beginSingleTimeCommands(State* state) {
+VkCommandBuffer beginSingleTimeCommands(State* state, VkCommandPool commandPool) {
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandPool = state->renderer.commandPool;
+	allocInfo.commandPool = commandPool,
 	allocInfo.commandBufferCount = 1;
 
 	VkCommandBuffer commandBuffer;
@@ -69,7 +69,7 @@ void endSingleTimeCommands(State *state,VkCommandBuffer commandBuffer) {
 	vkFreeCommandBuffers(state->context.device, state->renderer.commandPool, 1, &commandBuffer);
 }
 void copyBuffer(State* state, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-	VkCommandBuffer commandBuffer = beginSingleTimeCommands(state);
+	VkCommandBuffer commandBuffer = beginSingleTimeCommands(state, state->renderer.commandPool);
 
 	VkBufferCopy copyRegion{};
 	copyRegion.size = size;
@@ -361,7 +361,7 @@ void commandBufferRecord(State* state) {
 	pushConstants.emissiveTextureSet = 4;
 	pushConstants.alphaMask = 0.0f;
 	pushConstants.alphaMaskCutoff = 0.5f;
-
+	
 	vkCmdPushConstants(
 		cmd,
 		state->renderer.pipelineLayout,
@@ -372,8 +372,20 @@ void commandBufferRecord(State* state) {
 	);
 
 	// Textures (set 1) are bound inside drawMesh per material
-	drawNode(state, cmd, state->scene.rootNode);
+	std::vector<DrawItem> drawItems;
+	gatherDrawItems(state->scene.rootNode, state->scene.camera.getPosition(), drawItems);
+	std::sort(drawItems.begin(), drawItems.end(),
+		[](const DrawItem& a, const DrawItem& b) {
+			return a.distanceToCamera > b.distanceToCamera; // back-to-front
+		});
+	//drawNode(state, cmd, state->scene.rootNode);
+	for (const DrawItem& item : drawItems) {
+		drawMesh(state, cmd, *item.mesh);
+	}
 
 	vkCmdEndRenderPass(cmd);
+
+	guiDraw(state, cmd);
+
 	PANIC(vkEndCommandBuffer(cmd), "Failed To Record Command Buffer");
 }

@@ -91,20 +91,25 @@ void windowCreate(State* state) {
 	surfaceCreate(state);
 	deviceCreate(state);
 
+
 	swapchainCreate(state);
 	swapchainImageGet(state);
 	imageViewsCreate(state);
-
 	renderPassCreate(state);
 
+	guiRenderPassCreate(state);
+	guiFramebuffersCreate(state);
+	guiDescriptorPoolCreate(state);   // <-- MUST be here
+
+	guiInit(state);
 	// MUST come BEFORE pipeline creation
 	createGlobalSetLayout(state);
-	createTextureSetLayout(state);   // <-- you were missing this
+	createTextureSetLayout(state);   
 
-	graphicsPipelineCreate(state);   // now both set layouts exist
 
+
+	graphicsPipelineCreate(state);  
 	commandPoolCreate(state);
-
 	colorResourceCreate(state);
 	depthResourceCreate(state);
 	frameBuffersCreate(state);
@@ -134,6 +139,8 @@ void windowCreate(State* state) {
 
 void windowDestroy(State* state) {
 	swapchainCleanup(state);
+	
+	guiClean(state);
 	modelUnload(state);
 	uniformBuffersDestroy(state);
 	descriptorPoolDestroy(state);
@@ -153,9 +160,8 @@ void windowDestroy(State* state) {
 
 //Swapchain
 VkSurfaceCapabilitiesKHR surfaceCapabilitiesGet(State* state) {
-	VkSurfaceCapabilitiesKHR capabilities;
-	PANIC(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(state->context.physicalDevice, state->window.surface, &capabilities), "Failed To Get Surface Cababilities");
-	return capabilities;
+	PANIC(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(state->context.physicalDevice, state->window.surface, &state->window.surfaceCapabilities), "Failed To Get Surface Cababilities");
+	return state->window.surfaceCapabilities;
 };
 VkSurfaceFormatKHR surfaceFormatSelect(State* state) {
 	uint32_t formatCount;
@@ -201,9 +207,9 @@ VkPresentModeKHR presentModeSelect(State* state) {
 
 void swapchainImageGet(State* state) {
 	PANIC(vkGetSwapchainImagesKHR(state->context.device, state->window.swapchain.handle, &state->window.swapchain.imageCount, nullptr), "Failed to Get Swapchain Image Count");
-	state->window.swapchain.images = (VkImage*)malloc(state->window.swapchain.imageCount * sizeof(VkImage));
-	PANIC(!state->window.swapchain.images, "Failed To Enumerate Swapchain Image Memory");
-	PANIC(vkGetSwapchainImagesKHR(state->context.device, state->window.swapchain.handle, &state->window.swapchain.imageCount, state->window.swapchain.images), "Failed To Get Swapchain Images");
+	state->window.swapchain.images.resize(state->window.swapchain.imageCount);
+	PANIC(!state->window.swapchain.images.data(), "Failed To Enumerate Swapchain Image Memory");
+	PANIC(vkGetSwapchainImagesKHR(state->context.device, state->window.swapchain.handle, &state->window.swapchain.imageCount, state->window.swapchain.images.data()), "Failed To Get Swapchain Images");
 };
 void imageViewsCreate(State* state) {
 	state->window.swapchain.imageViews = (VkImageView *)malloc(state->window.swapchain.imageCount * sizeof(VkImageView));
@@ -253,11 +259,13 @@ void swapchainDestroy(State* state) {
 };
 
 void swapchainCleanup(State* state) {
+	
 	colorResourceDestroy(state);
 	depthBufferDestroy(state),
 	frameBuffersDestroy(state);
 	imageViewsDestroy(state);
 	swapchainDestroy(state);
+	guiFramebuffersDestroy(state);
 };
 void swapchainRecreate(State* state) {
 	int width = 0, height = 0;
@@ -271,10 +279,19 @@ void swapchainRecreate(State* state) {
 	swapchainCleanup(state);
 	swapchainCreate(state);
 	swapchainImageGet(state);
+	
+	transitionSwapchainImagesToPresent(state);
+
 	imageViewsCreate(state);
 	colorResourceCreate(state);
 	depthResourceCreate(state);
+
+
 	frameBuffersCreate(state);
+	guiFramebuffersCreate(state);
+	ImGui_ImplVulkan_SetMinImageCount(state->window.swapchain.imageCount);
+	commandBufferRecord(state);
+
 };
 
 //Draw
@@ -331,6 +348,21 @@ void frameDraw(State* state) {
 	}
 	state->renderer.frameIndex = (state->renderer.frameIndex + 1) % state->config.swapchainBuffering;
 };
+
+void updateFPS(State* state) {
+	static int frameCount = 0;
+	static double lastTime = glfwGetTime();
+
+	double currentTime = glfwGetTime();
+	frameCount++;
+
+	if (currentTime - lastTime >= 1.0) {
+		state->gui.io.Framerate = frameCount;   // store FPS somewhere in your state
+		frameCount = 0;
+		lastTime = currentTime;
+	}
+}
+
 
 void processInput(State* state) {
 	// Calculate delta time

@@ -7,6 +7,7 @@ bool hasStencilComponent(VkFormat format);
 void imageCreate(State* state, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory, uint32_t mipLevels, VkSampleCountFlagBits numSamples);
 
 void transitionImageLayout(State* state, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
+void transitionSwapchainImagesToPresent(State* state);
 void copyBufferToImage(State * state, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
 void textureImageCreate(State* state, std::string texturePath);
