@@ -84,7 +84,7 @@ enum struct CameraMovement {
 };
 struct Camera {
 	glm::vec3 front = glm::vec3 (0.0f ,0.0f ,1.0f);   
-	glm::vec3 right = glm:: vec3 (-1.0f,0.0f,0.0f);   
+	glm::vec3 right = glm:: vec3 (1.0f,0.0f,0.0f);   
 	glm::vec3 worldUp = glm::vec3 (0.0f, 1.0f, 0.0f);
 	glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);  // Start at world origin
 	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);        // Y-axis as world up
@@ -203,16 +203,14 @@ struct Material {
 };
 
 struct Mesh {
-	std::vector<Vertex> vertices;
+	std::vector<Vertex>   vertices;
 	std::vector<uint32_t> indices;
+	int                   materialIndex = -1;
 
-	VkBuffer vertexBuffer = VK_NULL_HANDLE;
+	VkBuffer       vertexBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
-
-	VkBuffer indexBuffer = VK_NULL_HANDLE;
+	VkBuffer       indexBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory indexMemory = VK_NULL_HANDLE;
-
-	int materialIndex = -1;
 };
 
 
@@ -225,7 +223,7 @@ struct Node {
 
 	// For animation
 	glm::vec3 translation = glm::vec3(0.0f);
-	glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+	glm::quat rotation = glm::quat(-1.0f, 0.0f, 0.0f, 0.0f);
 	glm::vec3 scale = glm::vec3(1.0f);
 
 	glm::mat4 getLocalMatrix() const {
@@ -338,40 +336,6 @@ struct Model {
 	}
 };
 
-struct GameObject {
-	std::string name;
-	std::vector<Model> models;
-	float sortKey;  // Key for sorting (e.g., distance to camera)
-
-	// Transform properties
-	glm::vec3 position = { 0.0f, 0.0f, 0.0f };
-	glm::vec3 rotation = { 0.0f, 0.0f, 0.0f };
-	glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
-
-	// Uniform buffer for this object (one per frame in flight)
-	std::vector<VkBuffer> uniformBuffers;
-	std::vector<VkDeviceMemory> uniformBuffersMemory;
-	std::vector<void*> uniformBuffersMapped;
-
-	// Descriptor sets for this object (one per frame in flight)
-	std::vector<VkDescriptorSet> descriptorSets;
-	// Calculate model matrix based on position, rotation, and scale
-	glm::mat4 getModelMatrix() const {
-		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, position);
-		model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-		model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-		model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
-		model = glm::scale(model, scale);
-		return model;
-	}
-};
-
-
-
-
-
-
 typedef struct {
 	std::string name;
 	VkImage textureImage;
@@ -389,16 +353,16 @@ typedef struct {
 	VkImageView colorImageView;
 
 	VkDescriptorSet descriptorSet;
+	VkFormat format;
 
 }Texture;
 
-const int objectsMax = 3;
 struct Scene {
 	Node* rootNode = nullptr;
 
+
 	std::vector<Texture> textures;
 	std::vector<Material> materials;
-	std::array<GameObject, objectsMax> gameObjects;
 	Camera camera;
 };
 
@@ -477,6 +441,14 @@ typedef struct {
 typedef struct {
 	VkPipeline graphicsPipeline;
 	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSetLayout textureSetLayout;
+	VkDescriptorSet descriptorSet;
+	VkDescriptorSet textureDescriptorSet;
+
+	std::vector<VkBuffer> uniformBuffers;
+	std::vector<VkDeviceMemory> uniformBuffersMemory;
+	std::vector<void*> uniformBuffersMapped;
+
 	VkPipelineLayout pipelineLayout;
 	VkRenderPass renderPass;
 	VkCommandPool commandPool;

@@ -13,10 +13,10 @@ void copyBuffer(State* state, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSi
 void frameBuffersCreate(State* state);
 void frameBuffersDestroy(State* state);
 
-void vertexBufferCreate(State* state);
+void vertexBufferCreateForMesh(State* state, const std::vector<Vertex>& vertices, VkBuffer& vertexBuffer, VkDeviceMemory& vertexMemory);
 void vertexBufferDestroy(State* state);
 
-void indexBufferCreate(State* state);
+void indexBufferCreateForMesh(State* state, const std::vector<uint32_t>& indices, VkBuffer& indexBuffer, VkDeviceMemory& indexMemory);
 void indexBufferDestroy(State* state);
 
 void uniformBuffersCreate(State* state);

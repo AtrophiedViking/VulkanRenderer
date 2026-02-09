@@ -5,7 +5,10 @@
 void renderPassCreate(State* state);
 void renderPassDestroy(State* state);
 
-void descriptorSetLayoutCreate(State* state);
+// set 0: global UBO
+void createGlobalSetLayout(State* state);
+// set 1: texture (for now, just baseColor at binding 0)
+void createTextureSetLayout(State* state);
 void descriptorSetLayoutDestroy(State* state);
 
 void graphicsPipelineCreate(State* state);
@@ -16,7 +19,6 @@ void commandPoolDestroy(State* state);
 
 void descriptorPoolCreate(State* state);
 void descriptorSetsCreate(State* state);
-void descriptorSetsDestroy(State* state);
 void descriptorPoolDestroy(State* state);
 
 void syncObjectsCreate(State* state);

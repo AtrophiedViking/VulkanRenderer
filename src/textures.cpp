@@ -1,6 +1,8 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include <ktx.h>
 #include "headers/textures.h"
+#include <ktx.h>
+#include <ktxvulkan.h>
+
 //Utility
 VkFormat findSupportedFormat(State *state, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {
@@ -173,6 +175,12 @@ void textureImageCreate(State* state, std::string texturePath) {
     ktx_size_t imageSize = ktxTexture_GetImageSize(kTexture, 0);
     ktx_uint8_t* ktxTextureData = ktxTexture_GetData(kTexture);
 
+    VkFormat textureFormat = ktxTexture_GetVkFormat(kTexture);
+
+    // Save the actual format used for image creation so image views use the
+    // identical format (required by Vulkan unless VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT).
+    state->texture.format = textureFormat;
+
     state->texture.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
     VkBuffer stagingBuffer;
@@ -185,17 +193,27 @@ void textureImageCreate(State* state, std::string texturePath) {
     memcpy(data, ktxTextureData, imageSize);
     vkUnmapMemory(state->context.device, stagingBufferMemory);
 
-    VkFormat textureFormat = VK_FORMAT_R8G8B8A8_SRGB;
-
     imageCreate(state, texWidth, texHeight, textureFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT| VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->texture.textureImage, state->texture.textureImageMemory, state->texture.mipLevels,VK_SAMPLE_COUNT_1_BIT);
 
-    transitionImageLayout(state, state->texture.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, state->texture.mipLevels);
+    transitionImageLayout(state, state->texture.textureImage, textureFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, state->texture.mipLevels);
     copyBufferToImage(state, stagingBuffer, state->texture.textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-    //transitionImageLayout(state, state->textures.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,state->textures.mipLevels);
     vkDestroyBuffer(state->context.device, stagingBuffer, nullptr);
     vkFreeMemory(state->context.device, stagingBufferMemory, nullptr);
-    generateMipmaps(state, state->texture.textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, state->texture.mipLevels);
+    generateMipmaps(state, state->texture.textureImage, textureFormat, texWidth, texHeight, state->texture.mipLevels);
     ktxTexture_Destroy(kTexture);
+};
+
+void textureImageViewCreate(State* state) {
+    // Use the exact VkFormat the image was created with.
+    VkFormat viewFormat = state->texture.format;
+    if (viewFormat == VK_FORMAT_UNDEFINED) {
+        // Fallback, but ideally format should always be set when image is created.
+        viewFormat = VK_FORMAT_R8G8B8A8_SRGB;
+    }
+    state->texture.textureImageView = imageViewCreate(state, state->texture.textureImage, viewFormat, VK_IMAGE_ASPECT_COLOR_BIT, state->texture.mipLevels);
+};
+void textureImageViewDestroy(State* state) {
+    vkDestroyImageView(state->context.device, state->texture.textureImageView, nullptr);
 };
 void textureImageDestroy(State* state) {
     vkDestroyImage(state->context.device, state->texture.textureImage, nullptr);
@@ -218,13 +236,6 @@ VkImageView imageViewCreate(State *state, VkImage image, VkFormat format, VkImag
     PANIC(vkCreateImageView(state->context.device, &viewInfo, nullptr, &imageView), "failed to create image view!");
 
     return imageView;
-};
-
-void textureImageViewCreate(State* state) {
-    state->texture.textureImageView = imageViewCreate(state, state->texture.textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, state->texture.mipLevels);
-};
-void textureImageViewDestroy(State* state) {
-    vkDestroyImageView(state->context.device, state->texture.textureImageView, nullptr);
 };
 
 void textureSamplerCreate(State* state) {

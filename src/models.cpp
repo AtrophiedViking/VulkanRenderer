@@ -4,7 +4,6 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <tiny_gltf.h>
 #include "headers/models.h"
-#include <ktxvulkan.h>
 //utility
 static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* parent, const std::string& baseDir) {
 	Node* newNode = new Node();
@@ -45,9 +44,9 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 			const tinygltf::Buffer* normalBuffer = nullptr;
 
 			if (hasNormals) {
-				const tinygltf::Accessor* normalAccessor = &model.accessors[primitive.attributes.at("NORMAL")];
-				const tinygltf::BufferView* normalBufferView = &model.bufferViews[normalAccessor->bufferView];
-				const tinygltf::Buffer* normalBuffer = &model.buffers[normalBufferView->buffer];
+				normalAccessor = &model.accessors[primitive.attributes.at("NORMAL")];
+				normalBufferView = &model.bufferViews[normalAccessor->bufferView];
+				normalBuffer = &model.buffers[normalBufferView->buffer];
 				std::printf("Normal accessor count: %i\n", (int)normalAccessor->count);
 			};
 			// Get texture coordinates if available
@@ -74,7 +73,7 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 				// glTF uses a right-handed coordinate system with Y-up
 				// Vulkan uses a right-handed coordinate system with Y-down
 				// We need to flip the Y coordinate
-				vertex.pos = { pos[0], -pos[1], pos[2] };
+				vertex.pos = { pos[0], pos[2], -pos[1] };
 
 				if (hasTexCoords)
 				{
@@ -149,6 +148,27 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 	}
 };
 
+void createMeshBuffers(State* state, Node* node) {
+	for (Mesh& mesh : node->meshes) {
+		std::cout << "createMeshBuffers: node=" << node->name
+			<< " verts=" << mesh.vertices.size()
+			<< " idx=" << mesh.indices.size() << "\n";
+
+		if (!mesh.vertices.empty()) {
+			vertexBufferCreateForMesh(state, mesh.vertices, mesh.vertexBuffer, mesh.vertexMemory);
+			std::cout << "  -> VBO created: " << (mesh.vertexBuffer != VK_NULL_HANDLE) << "\n";
+		}
+		if (!mesh.indices.empty()) {
+			indexBufferCreateForMesh(state, mesh.indices, mesh.indexBuffer, mesh.indexMemory);
+			std::cout << "  -> IBO created: " << (mesh.indexBuffer != VK_NULL_HANDLE) << "\n";
+		}
+	}
+
+	for (Node* child : node->children) {
+		createMeshBuffers(state, child);
+	}
+}
+
 
 //Loading
 void modelLoad(State *state, std::string modelPath)
@@ -198,6 +218,31 @@ void modelLoad(State *state, std::string modelPath)
 		baseDir = modelPath.substr(0, lastSlashPos + 1);
 	};
 
+	state->scene.materials.clear();
+	state->scene.materials.reserve(gltfModel.materials.size());
+
+
+	for (const auto& m : gltfModel.materials) {
+		Material mat{};
+
+		// baseColorFactor
+		if (m.pbrMetallicRoughness.baseColorFactor.size() == 4) {
+			mat.baseColorFactor = glm::vec4(
+				m.pbrMetallicRoughness.baseColorFactor[0],
+				m.pbrMetallicRoughness.baseColorFactor[1],
+				m.pbrMetallicRoughness.baseColorFactor[2],
+				m.pbrMetallicRoughness.baseColorFactor[3]
+			);
+		}
+
+		mat.baseColorTextureIndex = m.pbrMetallicRoughness.baseColorTexture.index;
+		mat.metallicFactor = m.pbrMetallicRoughness.metallicFactor;
+		mat.roughnessFactor = m.pbrMetallicRoughness.roughnessFactor;
+
+		state->scene.materials.push_back(mat);
+	}
+
+
 	const tinygltf::Scene& scene = gltfModel.scenes[gltfModel.defaultScene > -1 ? gltfModel.defaultScene : 0];
 	for (int nodeIndex : scene.nodes) {
 		// Process the node and its children recursively
@@ -208,52 +253,170 @@ void modelLoad(State *state, std::string modelPath)
 		gltfModel.nodes[nodeIndex] = node; // Update the node in the model with any changes made during processing
 	}
 
+	createMeshBuffers(state, state->scene.rootNode);
+
 	textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
 	textureImageViewCreate(state);
 	textureSamplerCreate(state);
+
+	state->scene.textures.clear();
+	Texture tex{};
+	tex.textureImageView = state->texture.textureImageView;
+	tex.textureSampler = state->texture.textureSampler;
+	state->scene.textures.push_back(tex);
 }
 
-void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh) {
-	// 1. Bind material/texture if available
-	if (mesh.materialIndex >= 0) {
-		const Material& mat = state->scene.materials[mesh.materialIndex];
+void modelUnload(State* state) {
+	// Clean up mesh buffers
+	std::function<void(Node*)> cleanupNode = [&](Node* node) {
+		for (Mesh& mesh : node->meshes) {
+			if (mesh.vertexBuffer != VK_NULL_HANDLE) {
+				vkDestroyBuffer(state->context.device, mesh.vertexBuffer, nullptr);
+				mesh.vertexBuffer = VK_NULL_HANDLE;
+			}
+			if (mesh.vertexMemory != VK_NULL_HANDLE) {
+				vkFreeMemory(state->context.device, mesh.vertexMemory, nullptr);
+				mesh.vertexMemory = VK_NULL_HANDLE;
+			}
+			if (mesh.indexBuffer != VK_NULL_HANDLE) {
+				vkDestroyBuffer(state->context.device, mesh.indexBuffer, nullptr);
+				mesh.indexBuffer = VK_NULL_HANDLE;
+			}
+			if (mesh.indexMemory != VK_NULL_HANDLE) {
+				vkFreeMemory(state->context.device, mesh.indexMemory, nullptr);
+				mesh.indexMemory = VK_NULL_HANDLE;
+			}
+		}
+		for (Node* child : node->children) {
+			cleanupNode(child);
+		}
+	};
+	if (state->scene.rootNode) {
+		cleanupNode(state->scene.rootNode);
+		delete state->scene.rootNode;
+		state->scene.rootNode = nullptr;
+	}
+	textureImageDestroy(state);
+	textureImageViewDestroy(state);
+	textureSamplerDestroy(state);
+}
 
-		if (mat.baseColorTextureIndex >= 0) {
-			const Texture& tex = state->scene.textures[mat.baseColorTextureIndex];
+void createTextureDescriptorSets(State* state) {
+	for (Texture& tex : state->scene.textures) {
+		VkDescriptorSetAllocateInfo allocInfo{
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.descriptorPool = state->renderer.descriptorPool,
+			.descriptorSetCount = 1,
+			.pSetLayouts = &state->renderer.textureSetLayout
+		};
+
+		PANIC(
+			vkAllocateDescriptorSets(state->context.device, &allocInfo, &tex.descriptorSet),
+			"Failed to allocate texture descriptor set"
+		);
+
+		// For now, use the same image for all 5 bindings
+		std::array<VkDescriptorImageInfo, 5> infos{};
+		for (uint32_t i = 0; i < 5; ++i) {
+			infos[i] = {
+				.sampler = tex.textureSampler,
+				.imageView = tex.textureImageView,
+				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+			};
+		}
+
+		std::array<VkWriteDescriptorSet, 5> writes{};
+		for (uint32_t i = 0; i < 5; ++i) {
+			writes[i] = {
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.dstSet = tex.descriptorSet,
+				.dstBinding = i,                         // 0..4
+				.descriptorCount = 1,
+				.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.pImageInfo = &infos[i]
+			};
+		}
+
+		vkUpdateDescriptorSets(
+			state->context.device,
+			static_cast<uint32_t>(writes.size()), writes.data(),
+			0, nullptr
+		);
+	}
+}
+
+
+void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh) {
+    if (mesh.vertexBuffer == VK_NULL_HANDLE || mesh.indexBuffer == VK_NULL_HANDLE) {
+        std::cout << "DRAW WARNING: mesh without GPU buffers, verts="
+                  << mesh.vertices.size() << " idx=" << mesh.indices.size()
+                  << " vbo=" << mesh.vertexBuffer
+                  << " ibo=" << mesh.indexBuffer << "\n";
+        return;
+    }
+
+    // 1. Bind material/texture set (set = 1) if valid
+    if (mesh.materialIndex >= 0 &&
+        mesh.materialIndex < static_cast<int>(state->scene.materials.size())) {
+
+        const Material& mat = state->scene.materials[mesh.materialIndex];
+
+        if (mat.baseColorTextureIndex >= 0 &&
+            mat.baseColorTextureIndex < static_cast<int>(state->scene.textures.size())) {
+
+            const Texture& tex = state->scene.textures[mat.baseColorTextureIndex];
+
+			std::cout << "Binding set 1: matIdx=" << mesh.materialIndex
+				<< " texIdx=" << mat.baseColorTextureIndex
+				<< " ds=" << tex.descriptorSet << "\n";
 
 			vkCmdBindDescriptorSets(
 				cmd,
 				VK_PIPELINE_BIND_POINT_GRAPHICS,
 				state->renderer.pipelineLayout,
-				1, // descriptor set 1 = material/texture
+				1, // firstSet = 1 → set 1
 				1,
-				&tex.descriptorSet, // you will create this per texture
+				&tex.descriptorSet,
 				0,
 				nullptr
 			);
-		}
-	}
 
-	// 2. Bind mesh vertex/index buffers
-	VkBuffer vertexBuffers[] = { mesh.vertexBuffer };
-	VkDeviceSize offsets[] = { 0 };
-	vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
+        }
+    }
 
-	vkCmdBindIndexBuffer(cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    // 2. Bind mesh vertex/index buffers
+    VkBuffer vertexBuffers[] = { mesh.vertexBuffer };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
 
-	// 3. Draw
-	vkCmdDrawIndexed(cmd, static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
+    vkCmdBindIndexBuffer(cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    // 3. Draw
+    vkCmdDrawIndexed(cmd, static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
 }
 
+
 void drawNode(State* state, VkCommandBuffer cmd, const Node* node) {
+	PushConstantBlock pushConstantBlock{
+			.baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f},
+			.metallicFactor = 1.0f,
+			.roughnessFactor = 0.5f,
+			.baseColorTextureSet = 0,
+			.physicalDescriptorTextureSet = 1,
+			.normalTextureSet = 2,
+			.occlusionTextureSet = 3,
+			.emissiveTextureSet = 4,
+			.alphaMask = 0.0f,
+			.alphaMaskCutoff = 0.5f
+	};
     // Push node transform (if you want)
     glm::mat4 modelMatrix = node->getGlobalMatrix();
-    vkCmdPushConstants(cmd,
-        state->renderer.pipelineLayout,
-        VK_SHADER_STAGE_VERTEX_BIT,
-        0,
-        sizeof(glm::mat4),
-        &modelMatrix
+	vkCmdPushConstants(cmd,
+		state->renderer.pipelineLayout,
+		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+		0,
+		sizeof(PushConstantBlock),
+		&pushConstantBlock
     );
 
     // Draw all meshes in this node

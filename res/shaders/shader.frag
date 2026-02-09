@@ -39,11 +39,11 @@ layout(binding = 0) uniform UniformBufferObject {
 // ─────────────────────────────────────────────
 // Textures (set = 0, bindings 1–5)
 // ─────────────────────────────────────────────
-layout(set = 0, binding = 1) uniform sampler2D baseColorTex;
-layout(set = 0, binding = 2) uniform sampler2D metallicRoughnessTex;
-layout(set = 0, binding = 3) uniform sampler2D normalTex;
-layout(set = 0, binding = 4) uniform sampler2D occlusionTex;
-layout(set = 0, binding = 5) uniform sampler2D emissiveTex;
+layout(set = 1, binding = 0) uniform sampler2D baseColorTex;
+layout(set = 1, binding = 1) uniform sampler2D metallicRoughnessTex;
+layout(set = 1, binding = 2) uniform sampler2D occlusionTex;
+layout(set = 1, binding = 3) uniform sampler2D emissiveTex;
+layout(set = 1, binding = 4) uniform sampler2D normalTex;
 
 // ─────────────────────────────────────────────
 // Inputs from vertex shader
@@ -111,5 +111,10 @@ void main()
     // Gamma correction
     color = pow(color * baseColor.a, vec3(1.0 / ubo.gamma));
 
-    outColor = vec4(color, baseColor.a);
+
+    vec4 sampledColor = texture(baseColorTex, fragTexCoordVS);
+    
+    // Apply vertex color and alpha
+    vec3 finalRGB = sampledColor.rgb * fragColorVS;
+    outColor = vec4(finalRGB, sampledColor.a);
 }

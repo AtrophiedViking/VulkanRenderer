@@ -84,43 +84,58 @@ void surfaceDestroy(State* state) {
 void windowCreate(State* state) {
 	initGLFW(state);
 	state->window.handle = glfwCreateWindow(state->config.windowWidth, state->config.windowHeight, state->config.windowTitle, nullptr, nullptr);
+
 	glfwSetFramebufferSizeCallback(state->window.handle, framebufferResizeCallback);
+
 	instanceCreate(state);
 	surfaceCreate(state);
 	deviceCreate(state);
+
 	swapchainCreate(state);
 	swapchainImageGet(state);
 	imageViewsCreate(state);
+
 	renderPassCreate(state);
-	descriptorSetLayoutCreate(state);
-	graphicsPipelineCreate(state);
+
+	// MUST come BEFORE pipeline creation
+	createGlobalSetLayout(state);
+	createTextureSetLayout(state);   // <-- you were missing this
+
+	graphicsPipelineCreate(state);   // now both set layouts exist
+
 	commandPoolCreate(state);
 
 	colorResourceCreate(state);
 	depthResourceCreate(state);
 	frameBuffersCreate(state);
+
 	glfwSetWindowUserPointer(state->window.handle, state);
 	glfwSetCursorPosCallback(state->window.handle, mouseCallback);
 
+	// Load model + textures BEFORE descriptor sets
 	modelLoad(state, state->config.KOBOLD_MODEL_PATH);
-	gameObjectsCreate(state, "");
 
-	vertexBufferCreate(state);
-	indexBufferCreate(state);
 	uniformBuffersCreate(state);
+
 	descriptorPoolCreate(state);
-	descriptorSetsCreate(state);
+
+	descriptorSetsCreate(state);        // global UBO set (set = 0)
+	createTextureDescriptorSets(state); // texture sets (set = 1)
+
 	commandBufferGet(state);
 	commandBufferRecord(state);
+
 	syncObjectsCreate(state);
-};
+}
+
+
+
+
+
 void windowDestroy(State* state) {
 	swapchainCleanup(state);
-	textureSamplerDestroy(state);
-	textureImageViewDestroy(state);
-	textureImageDestroy(state);
+	modelUnload(state);
 	uniformBuffersDestroy(state);
-	descriptorSetsDestroy(state);
 	descriptorPoolDestroy(state);
 	descriptorSetLayoutDestroy(state);
 	indexBufferDestroy(state);
