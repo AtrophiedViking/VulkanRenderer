@@ -372,18 +372,47 @@ void commandBufferRecord(State* state) {
 	);
 
 	// Textures (set 1) are bound inside drawMesh per material
-	std::vector<DrawItem> drawItems;
-	gatherDrawItems(state->scene.rootNode, state->scene.camera.getPosition(), drawItems);
-	std::sort(drawItems.begin(), drawItems.end(),
-		[](const DrawItem& a, const DrawItem& b) {
-			return a.distanceToCamera > b.distanceToCamera; // back-to-front
-		});
-	//drawNode(state, cmd, state->scene.rootNode);
-	for (const DrawItem& item : drawItems) {
+	// 1. Gather draw items
+	std::vector<DrawItem> items;
+	gatherDrawItems(
+		state->scene.rootNode,
+		state->scene.camera.getPosition(),
+		state->scene.materials,
+		items
+	);
+
+	// 2. Split opaque and transparent
+	std::vector<DrawItem> opaqueItems;
+	std::vector<DrawItem> transparentItems;
+
+	for (const DrawItem& item : items) {
+		if (item.transparent)
+			transparentItems.push_back(item);
+		else
+			opaqueItems.push_back(item);
+	}
+
+	// 3. Draw opaque (no sorting needed)
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.graphicsPipeline);
+
+	for (const DrawItem& item : opaqueItems) {
 		drawMesh(state, cmd, *item.mesh);
 	}
 
+	// 4. Sort transparent back-to-front
+	std::sort(transparentItems.begin(), transparentItems.end(),
+		[](const DrawItem& a, const DrawItem& b) {
+			return a.distanceToCamera > b.distanceToCamera; // far → near
+		});
+
+	// 5. Draw transparent with transparency pipeline
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.transparencyPipeline);
+
+	for (const DrawItem& item : transparentItems) {
+		drawMesh(state, cmd, *item.mesh);
+	}
 	vkCmdEndRenderPass(cmd);
+
 
 	guiDraw(state, cmd);
 

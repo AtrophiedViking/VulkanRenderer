@@ -149,32 +149,30 @@ void graphicsPipelineCreate(State* state) {
 	//ShaderModules
 	auto vertShaderCode = shaderRead("./res/shaders/vert.spv");
 	auto fragShaderCode = shaderRead("./res/shaders/frag.spv");
-	VkShaderModule vertShaderModule;
 	VkShaderModuleCreateInfo vertShaderModuleInfo{
 		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
 		.codeSize = vertShaderCode.size(),
 		.pCode = reinterpret_cast<const uint32_t*>(vertShaderCode.data()),
 	};
-	PANIC(vkCreateShaderModule(state->context.device, &vertShaderModuleInfo, nullptr, &vertShaderModule), "Failed To Create Vertex Shader Module");
-	VkShaderModule fragShaderModule;
+	PANIC(vkCreateShaderModule(state->context.device, &vertShaderModuleInfo, nullptr, &state->renderer.vertShaderModule), "Failed To Create Vertex Shader Module");
 	VkShaderModuleCreateInfo fragShaderModuleInfo{
 		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
 		.codeSize = fragShaderCode.size(),
 		.pCode = reinterpret_cast<const uint32_t*>(fragShaderCode.data()),
 	};
-	PANIC(vkCreateShaderModule(state->context.device, &fragShaderModuleInfo, nullptr, &fragShaderModule), "Failed To Create Fragment Shader Module");
+	PANIC(vkCreateShaderModule(state->context.device, &fragShaderModuleInfo, nullptr, &state->renderer.fragShaderModule), "Failed To Create Fragment Shader Module");
 
 	//ShaderStages
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 		.stage = VK_SHADER_STAGE_VERTEX_BIT,
-		.module = vertShaderModule,
+		.module = state->renderer.vertShaderModule,
 		.pName = "main"
 	};
 	VkPipelineShaderStageCreateInfo fragShaderStageInfo{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.module = fragShaderModule,
+		.module = state->renderer.fragShaderModule,
 		.pName = "main"
 	};
 	VkPipelineShaderStageCreateInfo shaderStages[]{ vertShaderStageInfo, fragShaderStageInfo };
@@ -233,7 +231,7 @@ void graphicsPipelineCreate(State* state) {
 	.depthClampEnable = VK_FALSE,
 	.rasterizerDiscardEnable = VK_FALSE,
 	.polygonMode = VK_POLYGON_MODE_FILL,
-	.cullMode = VK_CULL_MODE_NONE,
+	.cullMode = VK_CULL_MODE_BACK_BIT,
 	.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 	.depthBiasEnable = VK_TRUE,
 	.lineWidth = 1.0f,
@@ -289,7 +287,7 @@ void graphicsPipelineCreate(State* state) {
 	VkPipelineDepthStencilStateCreateInfo depthStencil{};
 	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depthStencil.depthTestEnable = VK_TRUE;
-	depthStencil.depthWriteEnable = VK_FALSE;
+	depthStencil.depthWriteEnable = VK_TRUE;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 	depthStencil.depthBoundsTestEnable = VK_FALSE;
 	depthStencil.stencilTestEnable = VK_FALSE;
@@ -313,9 +311,6 @@ void graphicsPipelineCreate(State* state) {
 		.basePipelineHandle = VK_NULL_HANDLE, // Optional
 	};
 	PANIC(vkCreateGraphicsPipelines(state->context.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &state->renderer.graphicsPipeline),"Failed To Create GraphicsPipeline");
-	//cleanup
-	vkDestroyShaderModule(state->context.device, fragShaderModule, nullptr);
-	vkDestroyShaderModule(state->context.device, vertShaderModule, nullptr);
 };
 void graphicsPipelineDestroy(State* state) {
 	vkDestroyPipelineLayout(state->context.device, state->renderer.pipelineLayout, nullptr);

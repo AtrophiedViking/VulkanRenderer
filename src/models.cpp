@@ -430,21 +430,40 @@ void drawNode(State* state, VkCommandBuffer cmd, const Node* node) {
     }
 }
 
+void gatherDrawItems( const Node* root, const glm::vec3& camPos, const std::vector<Material>& materials, std::vector<DrawItem>& out){
+	std::function<void(const Node*)> recurse = [&](const Node* node) {
 
-void gatherDrawItems(const Node* node,
-	const glm::vec3& camPos,
-	std::vector<DrawItem>& out)
-{
-	glm::mat4 model = node->getGlobalMatrix();
-	glm::vec3 worldPos = glm::vec3(model[3]); // extract translation
+		// FIX: extract translation from global matrix
+		glm::mat4 M = node->getGlobalMatrix();
+		glm::vec3 worldPos = glm::vec3(M[3]);
+		float dist = glm::length(worldPos - camPos);
 
-	float dist = glm::length(worldPos - camPos);
+		for (const Mesh& mesh : node->meshes) {
 
-	for (const Mesh& mesh : node->meshes) {
-		out.push_back({ node, &mesh, dist });
-	}
+			bool isTransparent = false;
 
-	for (const Node* child : node->children) {
-		gatherDrawItems(child, camPos, out);
-	}
+			if (mesh.materialIndex >= 0 && mesh.materialIndex < (int)materials.size()) {
+				const auto& mat = materials[mesh.materialIndex];
+
+				// Simple transparency rule
+				if (mat.baseColorFactor.a < 1.0f) {
+					isTransparent = true;
+				}
+			}
+
+			out.push_back({
+				.node = node,
+				.mesh = &mesh,
+				.distanceToCamera = dist,
+				.transparent = isTransparent
+			});
+
+		}
+
+		for (const Node* child : node->children) {
+			recurse(child);
+		}
+	};
+	recurse(root);
 }
+

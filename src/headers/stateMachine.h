@@ -371,12 +371,12 @@ typedef struct {
 }Texture;
 
 struct DrawItem {
-	const Node* node;
-	const Mesh* mesh;
-	float distanceToCamera;
-
-	
+    const Node* node;
+    const Mesh* mesh;
+    float distanceToCamera;
+    bool transparent;
 };
+
 
 struct Scene {
 	Node* rootNode = nullptr;
@@ -467,7 +467,14 @@ typedef struct {
 	std::vector<void*> uniformBuffersMapped;
 }Buffers;
 
+
+
+
 typedef struct {
+	//Sorting
+	std::vector<DrawItem> opaqueDrawItems;
+	std::vector<DrawItem> transparentDrawItems;
+
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSetLayout textureSetLayout;
 	VkDescriptorSet descriptorSet;
@@ -477,13 +484,17 @@ typedef struct {
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 	std::vector<void*> uniformBuffersMapped;
 	
-	//Pipelines
+	//Shaders
+	VkShaderModule vertShaderModule;
+	VkShaderModule fragShaderModule;
+
+	//graphicsPipeline
 	VkPipeline graphicsPipeline;
 	VkDescriptorPool descriptorPool;
 	VkPipelineLayout pipelineLayout;
 	VkRenderPass renderPass;
 	VkCommandPool commandPool;
-	
+	//transparencyPipeline
 	VkPipeline transparencyPipeline;
 	VkDescriptorPool transparencyDescriptorPool;
 	VkPipelineLayout transparencyPipelineLayout;

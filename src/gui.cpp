@@ -124,6 +124,7 @@ void guiInit(State* state) {
     style.ScrollbarSize = 14 * scale;
     style.WindowRounding = 4 * scale;
     style.Colors[ImGuiCol_TitleBg] = ImVec4(0.15, 0.075, 0.025, 0.85);
+    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.0, 0.0, 0.0, 0.85);
 	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.2, 0.2, 0.2, 0.75); // transparent background)
     style.Colors[ImGuiCol_Border] = ImVec4(0.15, 0.075, 0.025, 1.0);
 	state->gui.style = style;

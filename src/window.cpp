@@ -108,7 +108,8 @@ void windowCreate(State* state) {
 
 
 
-	graphicsPipelineCreate(state);  
+	graphicsPipelineCreate(state);
+	tranparencyPipelineCreate(state);
 	commandPoolCreate(state);
 	colorResourceCreate(state);
 	depthResourceCreate(state);
@@ -138,6 +139,8 @@ void windowCreate(State* state) {
 
 
 void windowDestroy(State* state) {
+	vkDestroyShaderModule(state->context.device, state->renderer.fragShaderModule, nullptr);
+	vkDestroyShaderModule(state->context.device, state->renderer.vertShaderModule, nullptr);
 	swapchainCleanup(state);
 	
 	guiClean(state);
@@ -149,6 +152,7 @@ void windowDestroy(State* state) {
 	vertexBufferDestroy(state);
 	syncObjectsDestroy(state);
 	commandPoolDestroy(state);
+	tranparencyPipelineDestroy(state);
 	graphicsPipelineDestroy(state);
 	renderPassDestroy(state);
 	deviceDestroy(state);
