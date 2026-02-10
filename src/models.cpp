@@ -222,9 +222,9 @@ void modelLoad(State *state, std::string modelPath)
 	state->scene.materials.reserve(gltfModel.materials.size());
 
 
+	std::vector<int> textureToImage;
 	for (const auto& m : gltfModel.materials) {
 		Material mat{};
-
 		// baseColorFactor
 		if (m.pbrMetallicRoughness.baseColorFactor.size() == 4) {
 			mat.baseColorFactor = glm::vec4(
@@ -235,7 +235,14 @@ void modelLoad(State *state, std::string modelPath)
 			);
 		}
 
-		mat.baseColorTextureIndex = m.pbrMetallicRoughness.baseColorTexture.index;
+		int texIndex = m.pbrMetallicRoughness.baseColorTexture.index;
+		if (texIndex >= 0 && texIndex < textureToImage.size()) {
+			mat.baseColorTextureIndex = textureToImage[texIndex];
+		}
+		else {
+			mat.baseColorTextureIndex = -1;
+		}
+
 		mat.metallicFactor = m.pbrMetallicRoughness.metallicFactor;
 		mat.roughnessFactor = m.pbrMetallicRoughness.roughnessFactor;
 
@@ -255,15 +262,47 @@ void modelLoad(State *state, std::string modelPath)
 
 	createMeshBuffers(state, state->scene.rootNode);
 
-	textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
-	textureImageViewCreate(state);
-	textureSamplerCreate(state);
 
-	state->scene.textures.clear();
-	Texture tex{};
-	tex.textureImageView = state->texture.textureImageView;
-	tex.textureSampler = state->texture.textureSampler;
-	state->scene.textures.push_back(tex);
+	if (!gltfModel.images.empty()) {
+
+    for (const auto& image : gltfModel.images) {
+        Texture tex{};
+        tex.name = image.name;
+
+        createTextureFromMemory(
+			state,
+            image.image.data(),
+            image.image.size(),
+            image.width,
+            image.height,
+            image.component,
+            tex
+        );
+
+        state->scene.textures.push_back(tex);
+
+
+		textureToImage.reserve(gltfModel.textures.size());
+
+		for (const auto& gltfTex : gltfModel.textures) {
+			textureToImage.push_back(gltfTex.source); // maps texture index → image index
+		}
+
+    }
+
+} else {
+    // No textures in GLB → load fallback
+    Texture tex{};
+    textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
+    textureImageViewCreate(state);
+    textureSamplerCreate(state);
+
+    tex.textureImageView = state->texture.textureImageView;
+    tex.textureSampler   = state->texture.textureSampler;
+
+    state->scene.textures.push_back(tex);
+}
+
 }
 
 void modelUnload(State* state) {
@@ -297,8 +336,6 @@ void modelUnload(State* state) {
 		state->scene.rootNode = nullptr;
 	}
 	textureImageDestroy(state);
-	textureImageViewDestroy(state);
-	textureSamplerDestroy(state);
 }
 
 void createTextureDescriptorSets(State* state) {
@@ -347,53 +384,53 @@ void createTextureDescriptorSets(State* state) {
 
 
 void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh) {
-    if (mesh.vertexBuffer == VK_NULL_HANDLE || mesh.indexBuffer == VK_NULL_HANDLE) {
-        std::cout << "DRAW WARNING: mesh without GPU buffers, verts="
-                  << mesh.vertices.size() << " idx=" << mesh.indices.size()
-                  << " vbo=" << mesh.vertexBuffer
-                  << " ibo=" << mesh.indexBuffer << "\n";
-        return;
-    }
+	const Material& mat = state->scene.materials[mesh.materialIndex];
 
-    // 1. Bind material/texture set (set = 1) if valid
-    if (mesh.materialIndex >= 0 &&
-        mesh.materialIndex < static_cast<int>(state->scene.materials.size())) {
+	int texIndex = mat.baseColorTextureIndex;
 
-        const Material& mat = state->scene.materials[mesh.materialIndex];
+	// If invalid, use fallback
+	if (texIndex < 0 || texIndex >= state->scene.textures.size()) {
+		texIndex = state->scene.defaultTextureIndex;
+	}
 
-        if (mat.baseColorTextureIndex >= 0 &&
-            mat.baseColorTextureIndex < static_cast<int>(state->scene.textures.size())) {
+	const Texture& tex = state->scene.textures[texIndex];
 
-            const Texture& tex = state->scene.textures[mat.baseColorTextureIndex];
+	vkCmdBindDescriptorSets(
+		cmd,
+		VK_PIPELINE_BIND_POINT_GRAPHICS,
+		state->renderer.pipelineLayout,
+		1, // set = 1
+		1,
+		&tex.descriptorSet,
+		0,
+		nullptr
+	);
 
-			std::cout << "Binding set 1: matIdx=" << mesh.materialIndex
-				<< " texIdx=" << mat.baseColorTextureIndex
-				<< " ds=" << tex.descriptorSet << "\n";
 
-			vkCmdBindDescriptorSets(
-				cmd,
-				VK_PIPELINE_BIND_POINT_GRAPHICS,
-				state->renderer.pipelineLayout,
-				1, // firstSet = 1 → set 1
-				1,
-				&tex.descriptorSet,
-				0,
-				nullptr
-			);
+	// Push constants for material factors
+	PushConstantBlock pcb{};
+	pcb.baseColorFactor = mat.baseColorFactor;
+	pcb.metallicFactor = mat.metallicFactor;
+	pcb.roughnessFactor = mat.roughnessFactor;
 
-        }
-    }
+	vkCmdPushConstants(
+		cmd,
+		state->renderer.pipelineLayout,
+		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+		0,
+		sizeof(PushConstantBlock),
+		&pcb
+	);
 
-    // 2. Bind mesh vertex/index buffers
-    VkBuffer vertexBuffers[] = { mesh.vertexBuffer };
-    VkDeviceSize offsets[] = { 0 };
-    vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
+	// Bind vertex + index buffers
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertexBuffer, offsets);
+	vkCmdBindIndexBuffer(cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    vkCmdBindIndexBuffer(cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-    // 3. Draw
-    vkCmdDrawIndexed(cmd, static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
+	// Draw
+	vkCmdDrawIndexed(cmd, mesh.indices.size(), 1, 0, 0, 0);
 }
+
 
 
 void drawNode(State* state, VkCommandBuffer cmd, const Node* node) {

@@ -318,21 +318,6 @@ void commandBufferRecord(State* state) {
 		0,
 		nullptr
 	);
-	if (!state->scene.textures.empty()) {
-		const Texture& tex = state->scene.textures[0];
-
-		vkCmdBindDescriptorSets(
-			cmd,
-			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			state->renderer.pipelineLayout,
-			1,      // firstSet = 1 → set 1
-			1,
-			&tex.descriptorSet,
-			0,
-			nullptr
-		);
-	}
-
 
 	VkViewport viewport{
 		.x = 0.0f,

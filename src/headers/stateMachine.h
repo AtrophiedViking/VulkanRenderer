@@ -380,6 +380,7 @@ struct DrawItem {
 
 struct Scene {
 	Node* rootNode = nullptr;
+	int defaultTextureIndex = 0;
 
 	std::vector<Texture> textures;
 	std::vector<Material> materials;

@@ -21,6 +21,10 @@ void textureImageViewDestroy(State* state);
 void textureSamplerCreate(State* state);
 void textureSamplerDestroy(State* state);
 
+void createTextureFromMemory(State* state,const unsigned char* pixels, size_t size, int width, int height, int channels, Texture& outTex);
+void destroyTextures(State* state); 
+
+
 void colorResourceCreate(State* state);
 void colorResourceDestroy(State* state);
 

@@ -145,6 +145,8 @@ void windowDestroy(State* state) {
 	
 	guiClean(state);
 	modelUnload(state);
+	destroyTextures(state);
+
 	uniformBuffersDestroy(state);
 	descriptorPoolDestroy(state);
 	descriptorSetLayoutDestroy(state);

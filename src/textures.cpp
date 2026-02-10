@@ -255,7 +255,10 @@ void textureImageViewDestroy(State* state) {
     vkDestroyImageView(state->context.device, state->texture.textureImageView, nullptr);
 };
 void textureImageDestroy(State* state) {
+	
     vkDestroyImage(state->context.device, state->texture.textureImage, nullptr);
+    
+    
     vkFreeMemory(state->context.device, state->texture.textureImageMemory, nullptr);
 };
 
@@ -303,6 +306,138 @@ void textureSamplerCreate(State* state) {
 void textureSamplerDestroy(State* state) {
     vkDestroySampler(state->context.device, state->texture.textureSampler, nullptr);
 };
+
+void createTextureFromMemory(
+    State* state,
+    const unsigned char* pixels,
+    size_t size,
+    int width,
+    int height,
+    int channels,
+    Texture& outTex)
+{
+    VkDevice device = state->context.device;
+
+    // 1. Determine format
+    VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
+    if (channels == 3)
+        format = VK_FORMAT_R8G8B8_SRGB;
+
+    outTex.format = format;
+
+    // 2. Create staging buffer
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingMemory;
+
+    createBuffer(
+        state,
+        size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer,
+        stagingMemory
+    );
+
+    // Copy pixel data
+    void* data;
+    vkMapMemory(device, stagingMemory, 0, size, 0, &data);
+    memcpy(data, pixels, size);
+    vkUnmapMemory(device, stagingMemory);
+
+    // 3. Create Vulkan image
+    outTex.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
+    imageCreate(
+        state,
+        width,
+        height,
+        format,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        outTex.textureImage,
+        outTex.textureImageMemory,
+        outTex.mipLevels,
+        VK_SAMPLE_COUNT_1_BIT
+    );
+
+    // 4. Transition + copy + mipmaps
+    transitionImageLayout(
+        state,
+        outTex.textureImage,
+        format,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        outTex.mipLevels
+    );
+
+    copyBufferToImage(
+        state,
+        stagingBuffer,
+        outTex.textureImage,
+        width,
+        height
+    );
+
+    generateMipmaps(
+        state,
+        outTex.textureImage,
+        format,
+        width,
+        height,
+        outTex.mipLevels
+    );
+
+    // 5. Create image view
+    outTex.textureImageView = imageViewCreate(
+        state,
+        outTex.textureImage,
+        format,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        outTex.mipLevels
+    );
+
+    // 6. Create sampler
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = static_cast<float>(outTex.mipLevels);
+
+    vkCreateSampler(device, &samplerInfo, nullptr, &outTex.textureSampler);
+
+    // 7. Cleanup staging
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingMemory, nullptr);
+}
+void destroyTextures(State* state) {
+    VkDevice device = state->context.device;
+
+    for (Texture& tex : state->scene.textures) {
+        if (tex.textureSampler != VK_NULL_HANDLE)
+            vkDestroySampler(device, tex.textureSampler, nullptr);
+
+        if (tex.textureImageView != VK_NULL_HANDLE)
+            vkDestroyImageView(device, tex.textureImageView, nullptr);
+
+        if (tex.textureImage != VK_NULL_HANDLE)
+            vkDestroyImage(device, tex.textureImage, nullptr);
+
+        if (tex.textureImageMemory != VK_NULL_HANDLE)
+            vkFreeMemory(device, tex.textureImageMemory, nullptr);
+    }
+
+    state->scene.textures.clear();
+}
+
+
 void colorResourceCreate(State* state) {
     VkFormat colorFormat = state->window.swapchain.format;
 
