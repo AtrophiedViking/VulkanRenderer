@@ -468,7 +468,6 @@ typedef struct {
 }Buffers;
 
 typedef struct {
-	VkPipeline graphicsPipeline;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSetLayout textureSetLayout;
 	VkDescriptorSet descriptorSet;
@@ -477,11 +476,19 @@ typedef struct {
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 	std::vector<void*> uniformBuffersMapped;
-
+	
+	//Pipelines
+	VkPipeline graphicsPipeline;
+	VkDescriptorPool descriptorPool;
 	VkPipelineLayout pipelineLayout;
 	VkRenderPass renderPass;
 	VkCommandPool commandPool;
-	VkDescriptorPool descriptorPool;
+	
+	VkPipeline transparencyPipeline;
+	VkDescriptorPool transparencyDescriptorPool;
+	VkPipelineLayout transparencyPipelineLayout;
+	VkRenderPass transparencyRenderPass;
+	
 	uint32_t imageAquiredIndex;
 	VkSemaphore *imageAvailableSemaphore;
 	VkSemaphore *renderFinishedSemaphore;

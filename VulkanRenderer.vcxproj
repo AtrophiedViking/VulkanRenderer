@@ -131,6 +131,7 @@
     <ClCompile Include="src\buffers.cpp" />
     <ClCompile Include="src\camera.cpp" />
     <ClCompile Include="src\context.cpp" />
+    <ClCompile Include="src\graphicsPipeline.cpp" />
     <ClCompile Include="src\gui.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
     <ClCompile Include="src\imgui\imgui_demo.cpp" />
@@ -151,6 +152,7 @@
     <ClInclude Include="src\headers\buffers.h" />
     <ClInclude Include="src\headers\camera.h" />
     <ClInclude Include="src\headers\context.h" />
+    <ClInclude Include="src\headers\graphicsPipeline.h" />
     <ClInclude Include="src\headers\gui.h" />
     <ClInclude Include="src\headers\models.h" />
     <ClInclude Include="src\headers\renderer.h" />

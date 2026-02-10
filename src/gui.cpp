@@ -77,28 +77,24 @@ void guiFramebuffersDestroy(State* state) {
     state->gui.framebuffers.clear();
 }
 
-
-
 void guiInit(State* state) {
     ImGui::CreateContext();
     state->gui.io = ImGui::GetIO();
+
     state->gui.io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     state->gui.io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     state->gui.io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    
-    state->gui.style = ImGui::GetStyle();
-    state->gui.style.ScaleAllSizes(22.0f / 16.0f);   // scale relative to default 16px font
-
+	state->gui.io.IniFilename = nullptr; // disable saving .ini file
+    ImGui::LoadIniSettingsFromMemory("");
     ImGui_ImplGlfw_InitForVulkan(state->window.handle, true);
 
-    uint32_t minImageCount = state->window.surfaceCapabilities.minImageCount + 1;
-    if (state->window.surfaceCapabilities.maxImageCount > 0 &&
-        minImageCount > state->window.surfaceCapabilities.maxImageCount)
-    {
-        minImageCount = state->window.surfaceCapabilities.maxImageCount;
-    }
+    // 1. Load default font at custom size
+    float fontSize = 24;
+    ImFontConfig cfg;
+    cfg.SizePixels = fontSize;
+    state->gui.io.Fonts->AddFontDefault(&cfg);
 
-
+    // 2. Init Vulkan backend
     ImGui_ImplVulkan_InitInfo initInfo{};
     initInfo.Instance       = state->context.instance;
     initInfo.PhysicalDevice = state->context.physicalDevice;
@@ -108,15 +104,29 @@ void guiInit(State* state) {
     initInfo.DescriptorPool = state->gui.descriptorPool;
     initInfo.MinImageCount  = state->window.swapchain.imageCount;
     initInfo.ImageCount     = state->window.swapchain.imageCount;
+    initInfo.UseDynamicRendering = false;
+    initInfo.PipelineInfoMain.RenderPass        = state->gui.renderPass;
+    initInfo.PipelineInfoForViewports.RenderPass = state->gui.renderPass;
 
-// Tell ImGui which render pass to build its pipeline for:
-initInfo.UseDynamicRendering = false;
-initInfo.PipelineInfoMain.RenderPass        = state->gui.renderPass;
-initInfo.PipelineInfoForViewports.RenderPass = state->gui.renderPass;
+    ImGui_ImplVulkan_Init(&initInfo);
 
-bool ok = ImGui_ImplVulkan_Init(&initInfo);
-assert(ok);
-//style.ScaleAllSizes(22.0f / 16.0f);   // scale relative to default 16px font
+    float scale = fontSize / 16.0f;
+
+    // 3. Scale the REAL style (not a copy)
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.ScaleAllSizes(fontSize / 16.0f);
+
+    // Docking node padding
+    style.WindowPadding = ImVec2(8 * scale, 8 * scale);
+    style.FramePadding = ImVec2(6 * scale, 4 * scale);
+    style.ItemSpacing = ImVec2(8 * scale, 6 * scale);
+    style.TabRounding = 4 * scale;
+    style.ScrollbarSize = 14 * scale;
+    style.WindowRounding = 4 * scale;
+    style.Colors[ImGuiCol_TitleBg] = ImVec4(0.15, 0.075, 0.025, 0.85);
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.2, 0.2, 0.2, 0.75); // transparent background)
+    style.Colors[ImGuiCol_Border] = ImVec4(0.15, 0.075, 0.025, 1.0);
+	state->gui.style = style;
 }
 
 void guiDraw(State* state, VkCommandBuffer cmd) {
@@ -125,8 +135,8 @@ void guiDraw(State* state, VkCommandBuffer cmd) {
     ImGui::NewFrame();
 
     // Build UI
-    ImGui::Begin("Debug");
-    ImGui::Text("FPS: %.1f", state->gui.io.Framerate);
+    ImGui::Begin("FPS");
+    ImGui::Text("  %.1f   ", state->gui.io.Framerate);
     ImGui::End();
 
     ImGui::Render();
@@ -144,7 +154,6 @@ void guiDraw(State* state, VkCommandBuffer cmd) {
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd, VK_NULL_HANDLE);
     vkCmdEndRenderPass(cmd);
 }
-
 
 void guiClean(State* state) {
     ImGui_ImplVulkan_Shutdown();

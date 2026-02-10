@@ -77,6 +77,9 @@
     <ClCompile Include="src\imgui\imgui_demo.cpp">
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="src\graphicsPipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\headers\application.h">
@@ -135,6 +138,9 @@
     </ClInclude>
     <ClInclude Include="src\imgui\imstb_truetype.h">
       <Filter>Source Files\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\headers\graphicsPipeline.h">
+      <Filter>Source Files\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
