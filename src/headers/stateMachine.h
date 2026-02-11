@@ -101,14 +101,14 @@ struct Camera {
 	glm::vec3 worldUp = glm::vec3 (0.0f, 1.0f, 0.0f);
 	glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);  // Start at world origin
 	glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);        // Y-axis as world up
-	float yaw = -90.0f;                                 // Look along negative Z-axis (OpenGL convention)
+	float yaw = 90.0f;                                 // Look along negative Z-axis (OpenGL convention)
 	float pitch = 0.0f;
 	float zoom = (100.0f);
 
 	float movementSpeed = 1;    
 	float mouseSensitivity = 0.1f; 
 
-	bool lookMode = true;
+	bool lookMode;
 
 	void updateCameraVectors() {
 		// Calculate the new front vector
@@ -170,7 +170,9 @@ struct Camera {
 		}
 
 		// Update camera vectors based on updated Euler angles
-		updateCameraVectors();
+		if (lookMode) {
+			updateCameraVectors();
+		};
 	}
 };
 
@@ -289,6 +291,7 @@ struct Model {
 	std::vector<Node*> nodes;
 	std::vector<Node*> linearNodes;
 	std::vector<Animation> animations;
+	glm::mat4 transform = glm::mat4(1.0f);
 
 	~Model() {
 		for (auto node : linearNodes) {

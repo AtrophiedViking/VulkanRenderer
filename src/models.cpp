@@ -265,43 +265,44 @@ void modelLoad(State *state, std::string modelPath)
 
 	if (!gltfModel.images.empty()) {
 
-    for (const auto& image : gltfModel.images) {
-        Texture tex{};
-        tex.name = image.name;
+		for (const auto& image : gltfModel.images) {
+		    Texture tex{};
+		    tex.name = image.name;
 
-        createTextureFromMemory(
-			state,
-            image.image.data(),
-            image.image.size(),
-            image.width,
-            image.height,
-            image.component,
-            tex
-        );
+		    createTextureFromMemory(
+				state,
+		        image.image.data(),
+		        image.image.size(),
+		        image.width,
+		        image.height,
+		        image.component,
+		        tex
+		    );
 
-        state->scene.textures.push_back(tex);
+		    state->scene.textures.push_back(tex);
 
 
-		textureToImage.reserve(gltfModel.textures.size());
+			textureToImage.reserve(gltfModel.textures.size());
 
-		for (const auto& gltfTex : gltfModel.textures) {
-			textureToImage.push_back(gltfTex.source); // maps texture index → image index
+			for (const auto& gltfTex : gltfModel.textures) {
+				textureToImage.push_back(gltfTex.source); // maps texture index → image index
+			}
+
 		}
 
-    }
-
-} else {
-    // No textures in GLB → load fallback
-    Texture tex{};
-    textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
-    textureImageViewCreate(state);
-    textureSamplerCreate(state);
-
-    tex.textureImageView = state->texture.textureImageView;
-    tex.textureSampler   = state->texture.textureSampler;
-
-    state->scene.textures.push_back(tex);
-}
+	} 
+	else {
+	    // No textures in GLB → load fallback
+	    Texture tex{};
+	    textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
+	    textureImageViewCreate(state);
+	    textureSamplerCreate(state);
+	
+	    tex.textureImageView = state->texture.textureImageView;
+	    tex.textureSampler   = state->texture.textureSampler;
+	
+	    state->scene.textures.push_back(tex);
+	}
 
 }
 

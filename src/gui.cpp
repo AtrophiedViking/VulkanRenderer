@@ -89,10 +89,8 @@ void guiInit(State* state) {
     ImGui_ImplGlfw_InitForVulkan(state->window.handle, true);
 
     // 1. Load default font at custom size
-    float fontSize = 24;
-    ImFontConfig cfg;
-    cfg.SizePixels = fontSize;
-    state->gui.io.Fonts->AddFontDefault(&cfg);
+    float fontSize = 34;
+	state->gui.io.Fonts->AddFontFromFileTTF("src/fonts/digital.ttf", fontSize);
 
     // 2. Init Vulkan backend
     ImGui_ImplVulkan_InitInfo initInfo{};
@@ -125,8 +123,15 @@ void guiInit(State* state) {
     style.WindowRounding = 4 * scale;
     style.Colors[ImGuiCol_TitleBg] = ImVec4(0.15, 0.075, 0.025, 0.85);
     style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.0, 0.0, 0.0, 0.85);
-	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.2, 0.2, 0.2, 0.75); // transparent background)
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.1, 0.1, 0.1, 0.75); // transparent background)
     style.Colors[ImGuiCol_Border] = ImVec4(0.15, 0.075, 0.025, 1.0);
+    style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.20, 0.20, 0.0, 0.85);
+	style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.15, 0.075, 0.025, 0.90);
+    style.Colors[ImGuiCol_Border] = ImVec4(0.15, 0.075, 0.025, 1.0);
+    style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.15, 0.075, 0.025, 0.0);
+    style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.20, 0.20, 0.0, 0.85);
+    style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.15, 0.075, 0.025, 0.90);
+	style.Colors[ImGuiCol_Text] = ImVec4(0.2f, 0.5f, 0.0f, 0.90);
 	state->gui.style = style;
 }
 

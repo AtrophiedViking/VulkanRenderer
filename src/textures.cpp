@@ -255,10 +255,10 @@ void textureImageViewDestroy(State* state) {
     vkDestroyImageView(state->context.device, state->texture.textureImageView, nullptr);
 };
 void textureImageDestroy(State* state) {
-	
+	if (state->texture.textureImage != VK_NULL_HANDLE)
     vkDestroyImage(state->context.device, state->texture.textureImage, nullptr);
     
-    
+	if (state->texture.textureImageMemory != VK_NULL_HANDLE)
     vkFreeMemory(state->context.device, state->texture.textureImageMemory, nullptr);
 };
 

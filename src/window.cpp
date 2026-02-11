@@ -23,34 +23,61 @@ void errorHandlingSetup(State* state) {
 
 //IO CallBacks
 void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
+	// First give ImGui the event
+	ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
 
+	// Then your camera logic
 	auto state = static_cast<State*>(glfwGetWindowUserPointer(window));
-	// State persistence for calculating movement deltas
-	// Static variables maintain state between callback invocations
-	static bool firstMouse = true;          // Flag to handle initial mouse position
-	static float lastX = 0.0f, lastY = 0.0f;  // Previous mouse position for delta calculation
 
-	// Handle initial mouse position to prevent sudden camera jumps
-	// First callback provides absolute position, not relative movement
+	static bool firstMouse = true;
+	static float lastX = 0.0f, lastY = 0.0f;
+
 	if (firstMouse) {
-		lastX = (float)xpos;               // Initialize previous position
+		lastX = (float)xpos;
 		lastY = (float)ypos;
-		firstMouse = false;         // Disable special handling for subsequent calls
+		firstMouse = false;
 	}
 
-	// Calculate mouse movement deltas since last callback
-	// These deltas represent the amount and direction of mouse movement
-	float xoffset = (float)xpos - lastX;                   // Horizontal movement (left-right)
-	float yoffset = lastY - (float)ypos;                   // Vertical movement (inverted: screen Y increases downward, camera pitch increases upward)
+	float xoffset = (float)xpos - lastX;
+	float yoffset = lastY - (float)ypos;
 
-	// Update state for next callback iteration
 	lastX = (float)xpos;
 	lastY = (float)ypos;
 
-	// Convert mouse movement to camera rotation
-	// Delta values drive continuous camera orientation changes
-	state->scene.camera.processMouseMovement(xoffset, yoffset, false);
-};
+	if (state->scene.camera.lookMode)
+		state->scene.camera.processMouseMovement(xoffset, yoffset, false);
+}
+
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+	// First ImGui
+	ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+
+	// Then your logic
+	auto state = static_cast<State*>(glfwGetWindowUserPointer(window));
+
+	if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+		if (action == GLFW_PRESS) {
+			state->scene.camera.lookMode = true;
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
+		else if (action == GLFW_RELEASE) {
+			state->scene.camera.lookMode = false;
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
+	}
+
+}
+
+void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+	ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+}
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+}
+void charCallback(GLFWwindow* window, unsigned int codepoint) {
+	ImGui_ImplGlfw_CharCallback(window, codepoint);
+}
+
 
 //utility
 static uint32_t clamp(uint32_t value, uint32_t min, uint32_t max){
@@ -115,8 +142,19 @@ void windowCreate(State* state) {
 	depthResourceCreate(state);
 	frameBuffersCreate(state);
 
+	// Store ImGui callbacks so we can chain them
+	auto imguiMouseCallback = ImGui_ImplGlfw_MouseButtonCallback;
+	auto imguiCursorCallback = ImGui_ImplGlfw_CursorPosCallback;
+	auto imguiScrollCallback = ImGui_ImplGlfw_ScrollCallback;
+	auto imguiKeyCallback = ImGui_ImplGlfw_KeyCallback;
+	auto imguiCharCallback = ImGui_ImplGlfw_CharCallback;
+
 	glfwSetWindowUserPointer(state->window.handle, state);
 	glfwSetCursorPosCallback(state->window.handle, mouseCallback);
+	glfwSetMouseButtonCallback(state->window.handle, mouseButtonCallback);
+	glfwSetCharCallback(state->window.handle, charCallback);
+	glfwSetKeyCallback(state->window.handle, keyCallback);
+
 
 	// Load model + textures BEFORE descriptor sets
 	modelLoad(state, state->config.KOBOLD_MODEL_PATH);
@@ -377,22 +415,31 @@ void processInput(State* state) {
 	float deltaTime = currentFrame - lastFrame;
 	lastFrame = currentFrame;
 
-	// Process keyboard input for camera movement
-	if (glfwGetKey(state->window.handle, GLFW_KEY_W) == GLFW_PRESS)
-		state->scene.camera.processKeyboard(CameraMovement::FORWARD, deltaTime);
-	if (glfwGetKey(state->window.handle, GLFW_KEY_S) == GLFW_PRESS)
-		state->scene.camera.processKeyboard(CameraMovement::BACKWARD, deltaTime);
-	if (glfwGetKey(state->window.handle, GLFW_KEY_A) == GLFW_PRESS)
-		state->scene.camera.processKeyboard(CameraMovement::LEFT, deltaTime);
-	if (glfwGetKey(state->window.handle, GLFW_KEY_D) == GLFW_PRESS)
-		state->scene.camera.processKeyboard(CameraMovement::RIGHT, deltaTime);
-	if (glfwGetKey(state->window.handle, GLFW_KEY_SPACE) == GLFW_PRESS)
-		state->scene.camera.processKeyboard(CameraMovement::UP, deltaTime);
-	if (glfwGetKey(state->window.handle, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-		state->scene.camera.processKeyboard(CameraMovement::DOWN, deltaTime);
+	ImGuiIO& io = ImGui::GetIO();
 
+	if (!state->scene.camera.lookMode) {
 
-	//Toggle Mouse
+	}
+	else {
+
+		// ⭐ CAMERA MOVEMENT MODE ⭐
+		// lookMode = true → camera moves with WASD, space, ctrl
+
+		if (glfwGetKey(state->window.handle, GLFW_KEY_W) == GLFW_PRESS)
+			state->scene.camera.processKeyboard(CameraMovement::FORWARD, deltaTime);
+		if (glfwGetKey(state->window.handle, GLFW_KEY_S) == GLFW_PRESS)
+			state->scene.camera.processKeyboard(CameraMovement::BACKWARD, deltaTime);
+		if (glfwGetKey(state->window.handle, GLFW_KEY_A) == GLFW_PRESS)
+			state->scene.camera.processKeyboard(CameraMovement::LEFT, deltaTime);
+		if (glfwGetKey(state->window.handle, GLFW_KEY_D) == GLFW_PRESS)
+			state->scene.camera.processKeyboard(CameraMovement::RIGHT, deltaTime);
+		if (glfwGetKey(state->window.handle, GLFW_KEY_SPACE) == GLFW_PRESS)
+			state->scene.camera.processKeyboard(CameraMovement::UP, deltaTime);
+		if (glfwGetKey(state->window.handle, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+			state->scene.camera.processKeyboard(CameraMovement::DOWN, deltaTime);
+	}
+
+	// Toggle Mouse Look Mode
 	static bool previous = false;
 	bool current = glfwGetKey(state->window.handle, GLFW_KEY_ESCAPE) == GLFW_PRESS;
 	if (current && !previous) {
@@ -404,5 +451,4 @@ void processInput(State* state) {
 		);
 	}
 	previous = current;
-
-};
+}
