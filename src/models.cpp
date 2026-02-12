@@ -62,6 +62,17 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 				texCoordBuffer = &model.buffers[texCoordBufferView->buffer];
 				std::printf("TexCoord accessor count: %i\n", (int)texCoordAccessor->count);
 			}
+			bool                        hasColors = primitive.attributes.find("COLOR") != primitive.attributes.end();
+			const tinygltf::Accessor* colorAccessor = nullptr;
+			const tinygltf::BufferView* colorBufferView = nullptr;
+			const tinygltf::Buffer* colorBuffer = nullptr;
+
+			if (hasColors) {
+				colorAccessor = &model.accessors[primitive.attributes.at("COLOR")];
+				colorBufferView = &model.bufferViews[normalAccessor->bufferView];
+				colorBuffer = &model.buffers[normalBufferView->buffer];
+				std::printf("Color accessor count: %i\n", (int)normalAccessor->count);
+			};
 
 			uint32_t baseVertex = static_cast<uint32_t>(newMesh.vertices.size());
 
@@ -85,8 +96,23 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 					vertex.texCoord = { 0.0f, 0.0f };
 				}
 
-				vertex.color = { 1.0f, 1.0f, 1.0f };
-
+				if (hasNormals)
+				{
+					const float* normal = reinterpret_cast<const float*>(&normalBuffer->data[normalBufferView->byteOffset + normalAccessor->byteOffset + i * 12]);
+					vertex.normal = { normal[0], normal[2], -normal[1] };
+				}
+				else
+				{
+					vertex.normal = { 0.0f, 0.0f, 0.0f };
+				}
+				if(hasColors)
+				{
+					const float* color = reinterpret_cast<const float*>(&colorBuffer->data[colorBufferView->byteOffset + colorAccessor->byteOffset + i * 16]);
+					vertex.color = { color[0], color[1], color[2] };
+				}
+				else {
+					vertex.color = { 1.0f, 1.0f, 1.0f };
+				}
 				newMesh.vertices.push_back(vertex);
 			}
 
@@ -171,9 +197,10 @@ void createMeshBuffers(State* state, Node* node) {
 
 
 //Loading
-void modelLoad(State *state, std::string modelPath)
+Model* modelLoad(State *state, std::string modelPath)
 {
 	// Use tinygltf to load the model instead of tinyobjloader
+	Model* model = new Model();
 	tinygltf::Model    gltfModel;
 	tinygltf::TinyGLTF loader;
 	std::string        err;
@@ -222,10 +249,12 @@ void modelLoad(State *state, std::string modelPath)
 	state->scene.materials.reserve(gltfModel.materials.size());
 
 
-	std::vector<int> textureToImage;
+	std::vector<int> textureToImage;  // maps glTF texture index → image index
+
 	for (const auto& m : gltfModel.materials) {
 		Material mat{};
-		// baseColorFactor
+
+		// Base color factor
 		if (m.pbrMetallicRoughness.baseColorFactor.size() == 4) {
 			mat.baseColorFactor = glm::vec4(
 				m.pbrMetallicRoughness.baseColorFactor[0],
@@ -235,14 +264,42 @@ void modelLoad(State *state, std::string modelPath)
 			);
 		}
 
-		int texIndex = m.pbrMetallicRoughness.baseColorTexture.index;
-		if (texIndex >= 0 && texIndex < textureToImage.size()) {
-			mat.baseColorTextureIndex = textureToImage[texIndex];
-		}
-		else {
-			mat.baseColorTextureIndex = -1;
-		}
+		// Base color texture
+		int baseIndex = m.pbrMetallicRoughness.baseColorTexture.index;
+		mat.baseColorTextureIndex =
+			(baseIndex >= 0 && baseIndex < textureToImage.size())
+			? textureToImage[baseIndex]
+			: -1;
 
+		// Metallic-Roughness texture
+		int mrIndex = m.pbrMetallicRoughness.metallicRoughnessTexture.index;
+		mat.metallicRoughnessTextureIndex =
+			(mrIndex >= 0 && mrIndex < textureToImage.size())
+			? textureToImage[mrIndex]
+			: -1;
+
+		// Normal texture
+		int normalIndex = m.normalTexture.index;
+		mat.normalTextureIndex =
+			(normalIndex >= 0 && normalIndex < textureToImage.size())
+			? textureToImage[normalIndex]
+			: -1;
+
+		// Occlusion texture
+		int occIndex = m.occlusionTexture.index;
+		mat.occlusionTextureIndex =
+			(occIndex >= 0 && occIndex < textureToImage.size())
+			? textureToImage[occIndex]
+			: -1;
+
+		// Emissive texture
+		int emissiveIndex = m.emissiveTexture.index;
+		mat.emissiveTextureIndex =
+			(emissiveIndex >= 0 && emissiveIndex < textureToImage.size())
+			? textureToImage[emissiveIndex]
+			: -1;
+
+		// Scalars
 		mat.metallicFactor = m.pbrMetallicRoughness.metallicFactor;
 		mat.roughnessFactor = m.pbrMetallicRoughness.roughnessFactor;
 
@@ -303,7 +360,7 @@ void modelLoad(State *state, std::string modelPath)
 	
 	    state->scene.textures.push_back(tex);
 	}
-
+	state->scene.models.push_back(*model);
 }
 
 void modelUnload(State* state) {
@@ -413,6 +470,13 @@ void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh) {
 	pcb.baseColorFactor = mat.baseColorFactor;
 	pcb.metallicFactor = mat.metallicFactor;
 	pcb.roughnessFactor = mat.roughnessFactor;
+	pcb.baseColorTextureSet = mat.baseColorTextureIndex;
+	pcb.physicalDescriptorTextureSet = mat.metallicRoughnessTextureIndex;
+	pcb.emissiveTextureSet = mat.emissiveTextureIndex;
+	pcb.normalTextureSet = mat.normalTextureIndex;
+	pcb.occlusionTextureSet = mat.occlusionTextureIndex;
+	pcb.alphaMask = 0.0f; // For simplicity, not handling alpha masking in this example
+	pcb.alphaMaskCutoff = 0.5f;
 
 	vkCmdPushConstants(
 		cmd,

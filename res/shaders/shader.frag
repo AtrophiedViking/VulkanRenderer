@@ -112,7 +112,7 @@ void main()
     color = pow(color * baseColor.a, vec3(1.0 / ubo.gamma));
 
 
-    vec4 sampledColor = texture(baseColorTex, fragTexCoordVS);
+    vec4 sampledColor = texture(color, fragTexCoordVS);
     
     // Apply vertex color and alpha
     vec3 finalRGB = sampledColor.rgb * fragColorVS;

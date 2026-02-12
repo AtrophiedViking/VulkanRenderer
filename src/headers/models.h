@@ -1,7 +1,7 @@
 #include "textures.h"
 
 
-void modelLoad(State* state, std::string modelPath);
+Model* modelLoad(State* state, std::string modelPath);
 void modelUnload(State* state);
 
 void createTextureDescriptorSets(State* state);

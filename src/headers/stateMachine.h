@@ -385,6 +385,7 @@ struct Scene {
 	Node* rootNode = nullptr;
 	int defaultTextureIndex = 0;
 
+	std::vector<Model> models;
 	std::vector<Texture> textures;
 	std::vector<Material> materials;
 	Camera camera;
@@ -479,6 +480,12 @@ typedef struct {
 	std::vector<DrawItem> opaqueDrawItems;
 	std::vector<DrawItem> transparentDrawItems;
 
+	uint32_t imageAquiredIndex;
+	VkSemaphore *imageAvailableSemaphore;
+	VkSemaphore *renderFinishedSemaphore;
+	VkFence *inFlightFence;
+	uint32_t frameIndex;
+
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSetLayout textureSetLayout;
 	VkDescriptorSet descriptorSet;
@@ -504,11 +511,6 @@ typedef struct {
 	VkPipelineLayout transparencyPipelineLayout;
 	VkRenderPass transparencyRenderPass;
 	
-	uint32_t imageAquiredIndex;
-	VkSemaphore *imageAvailableSemaphore;
-	VkSemaphore *renderFinishedSemaphore;
-	VkFence *inFlightFence;
-	uint32_t frameIndex;
 }Renderer;
 
 typedef struct {
