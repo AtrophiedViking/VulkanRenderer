@@ -235,9 +235,15 @@ Model* modelLoad(State *state, std::string modelPath)
 	{
 		throw std::runtime_error("Failed to load glTF model");
 	}
-
 	state->scene.rootNode = new Node();
 	state->scene.rootNode->name = "Root";
+
+	std::vector<int> textureToImage;
+	textureToImage.reserve(gltfModel.textures.size());
+
+	for (const auto& gltfTex : gltfModel.textures) {
+		textureToImage.push_back(gltfTex.source);
+	}
 
 	std::string baseDir = "";
 	size_t lastSlashPos = modelPath.find_last_of("/\\");
@@ -247,9 +253,6 @@ Model* modelLoad(State *state, std::string modelPath)
 
 	state->scene.materials.clear();
 	state->scene.materials.reserve(gltfModel.materials.size());
-
-
-	std::vector<int> textureToImage;  // maps glTF texture index → image index
 
 	for (const auto& m : gltfModel.materials) {
 		Material mat{};
@@ -321,46 +324,38 @@ Model* modelLoad(State *state, std::string modelPath)
 
 
 	if (!gltfModel.images.empty()) {
-
 		for (const auto& image : gltfModel.images) {
-		    Texture tex{};
-		    tex.name = image.name;
+			Texture tex{};
+			tex.name = image.name;
 
-		    createTextureFromMemory(
+			createTextureFromMemory(
 				state,
-		        image.image.data(),
-		        image.image.size(),
-		        image.width,
-		        image.height,
-		        image.component,
-		        tex
-		    );
+				image.image.data(),
+				image.image.size(),
+				image.width,
+				image.height,
+				image.component,
+				tex
+			);
 
-		    state->scene.textures.push_back(tex);
-
-
-			textureToImage.reserve(gltfModel.textures.size());
-
-			for (const auto& gltfTex : gltfModel.textures) {
-				textureToImage.push_back(gltfTex.source); // maps texture index → image index
-			}
-
+			state->scene.textures.push_back(tex);
 		}
-
-	} 
-	else {
-	    // No textures in GLB → load fallback
-	    Texture tex{};
-	    textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
-	    textureImageViewCreate(state);
-	    textureSamplerCreate(state);
-	
-	    tex.textureImageView = state->texture.textureImageView;
-	    tex.textureSampler   = state->texture.textureSampler;
-	
-	    state->scene.textures.push_back(tex);
 	}
+	else {
+		// Fallback texture
+		Texture tex{};
+		textureImageCreate(state, state->config.KOBOLD_TEXTURE_PATH);
+		textureImageViewCreate(state);
+		textureSamplerCreate(state);
+
+		tex.textureImageView = state->texture.textureImageView;
+		tex.textureSampler = state->texture.textureSampler;
+
+		state->scene.textures.push_back(tex);
+	}
+
 	state->scene.models.push_back(*model);
+	return model;
 }
 
 void modelUnload(State* state) {
@@ -397,6 +392,11 @@ void modelUnload(State* state) {
 }
 
 void createTextureDescriptorSets(State* state) {
+	Texture* fallbackTex = nullptr;
+	if (!state->scene.textures.empty()) {
+		fallbackTex = &state->scene.textures[0];
+	}
+
 	for (Texture& tex : state->scene.textures) {
 		VkDescriptorSetAllocateInfo allocInfo{
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
