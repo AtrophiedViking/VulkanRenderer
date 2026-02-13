@@ -5,174 +5,315 @@
 #include <tiny_gltf.h>
 #include "headers/models.h"
 //utility
-static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* parent, const std::string& baseDir) {
+static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* parent, const std::string& baseDir)
+{
 	Node* newNode = new Node();
 	newNode->name = node.name;
-	std::cout << "Processing node: " << node.name << std::endl;
-	// If the node has a mesh, process it
-	if(parent){
+
+	// ─────────────────────────────────────────────
+	// Node transform
+	// ─────────────────────────────────────────────
+	if (!node.matrix.empty()) {
+		newNode->matrix = glm::make_mat4(node.matrix.data());
+		newNode->translation = glm::vec3(0.0f);
+		newNode->rotation = glm::quat(1, 0, 0, 0);
+		newNode->scale = glm::vec3(1.0f);
+	}
+	else {
+		if (!node.translation.empty())
+			newNode->translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+		if (!node.rotation.empty())
+			newNode->rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+		if (!node.scale.empty())
+			newNode->scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+	}
+
+	if (parent) {
 		newNode->parent = parent;
 		parent->children.push_back(newNode);
 	}
+
+	// ─────────────────────────────────────────────
+	// Helper: decode normalized integer → float
+	// ─────────────────────────────────────────────
+	auto readFloat = [](const unsigned char* src, int componentType) -> float {
+		switch (componentType) {
+		case TINYGLTF_COMPONENT_TYPE_FLOAT:
+			return *reinterpret_cast<const float*>(src);
+
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+			return (*src) / 255.0f;
+
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+			return (*reinterpret_cast<const uint16_t*>(src)) / 65535.0f;
+
+		default:
+			throw std::runtime_error("Unsupported componentType for float conversion");
+		}
+		};
+
+	// ─────────────────────────────────────────────
+	// Process mesh
+	// ─────────────────────────────────────────────
 	if (node.mesh >= 0) {
 		const tinygltf::Mesh& mesh = model.meshes[node.mesh];
-		std::cout << "Processing mesh: " << mesh.name << std::endl;
 
-		// Process the mesh and its primitives
 		for (const auto& primitive : mesh.primitives) {
-			// Process the primitive (e.g., load vertex data, indices, materials)
-			std::cout << "Processing primitive with material index: " << primitive.material << std::endl;
-			// (Implementation of primitive processing is omitted for brevity)
 			Mesh newMesh;
-			// Get indices
-			const tinygltf::Accessor& indexAccessor = model.accessors[primitive.indices];
-			const tinygltf::BufferView& indexBufferView = model.bufferViews[indexAccessor.bufferView];
-			const tinygltf::Buffer& indexBuffer = model.buffers[indexBufferView.buffer];
-			std::printf("Index accessor count: %i\n", (int)indexAccessor.count);
 
+			// ─────────────────────────────────────────────
+			// Index buffer
+			// ─────────────────────────────────────────────
+			const auto& indexAccessor = model.accessors[primitive.indices];
+			const auto& indexBufferView = model.bufferViews[indexAccessor.bufferView];
+			const auto& indexBuffer = model.buffers[indexBufferView.buffer];
 
-			// Get vertex positions
-			const tinygltf::Accessor& posAccessor = model.accessors[primitive.attributes.at("POSITION")];
-			const tinygltf::BufferView& posBufferView = model.bufferViews[posAccessor.bufferView];
-			const tinygltf::Buffer& posBuffer = model.buffers[posBufferView.buffer];
-			std::printf("Position accessor count: %i\n", (int)posAccessor.count);
+			size_t indexCount = indexAccessor.count;
 
-			// Get vertex normals if available
-			bool                        hasNormals = primitive.attributes.find("NORMAL") != primitive.attributes.end();
+			const unsigned char* indexData =
+				&indexBuffer.data[indexBufferView.byteOffset + indexAccessor.byteOffset];
+
+			size_t indexStride = 0;
+			switch (indexAccessor.componentType) {
+			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: indexStride = 2; break;
+			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:   indexStride = 4; break;
+			case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:  indexStride = 1; break;
+			default: throw std::runtime_error("Unsupported index type");
+			}
+
+			// ─────────────────────────────────────────────
+			// POSITION (float only)
+			// ─────────────────────────────────────────────
+			const auto& posAccessor = model.accessors[primitive.attributes.at("POSITION")];
+			const auto& posBufferView = model.bufferViews[posAccessor.bufferView];
+			const auto& posBuffer = model.buffers[posBufferView.buffer];
+
+			if (posAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
+				throw std::runtime_error("POSITION must be FLOAT");
+
+			size_t posStride = posBufferView.byteStride ?
+				posBufferView.byteStride :
+				3 * sizeof(float);
+
+			// ─────────────────────────────────────────────
+			// NORMAL (float only)
+			// ─────────────────────────────────────────────
+			bool hasNormals = primitive.attributes.count("NORMAL");
 			const tinygltf::Accessor* normalAccessor = nullptr;
 			const tinygltf::BufferView* normalBufferView = nullptr;
 			const tinygltf::Buffer* normalBuffer = nullptr;
+			size_t normalStride = 0;
 
 			if (hasNormals) {
 				normalAccessor = &model.accessors[primitive.attributes.at("NORMAL")];
+				if (normalAccessor->componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
+					throw std::runtime_error("NORMAL must be FLOAT");
+
 				normalBufferView = &model.bufferViews[normalAccessor->bufferView];
 				normalBuffer = &model.buffers[normalBufferView->buffer];
-				std::printf("Normal accessor count: %i\n", (int)normalAccessor->count);
-			};
-			// Get texture coordinates if available
-			bool                        hasTexCoords = primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end();
-			const tinygltf::Accessor* texCoordAccessor = nullptr;
-			const tinygltf::BufferView* texCoordBufferView = nullptr;
-			const tinygltf::Buffer* texCoordBuffer = nullptr;
-
-			if (hasTexCoords)
-			{
-				texCoordAccessor = &model.accessors[primitive.attributes.at("TEXCOORD_0")];
-				texCoordBufferView = &model.bufferViews[texCoordAccessor->bufferView];
-				texCoordBuffer = &model.buffers[texCoordBufferView->buffer];
-				std::printf("TexCoord accessor count: %i\n", (int)texCoordAccessor->count);
+				normalStride = normalBufferView->byteStride ?
+					normalBufferView->byteStride :
+					3 * sizeof(float);
 			}
-			bool                        hasColors = primitive.attributes.find("COLOR") != primitive.attributes.end();
+			// ─────────────────────────────────────────────
+			// TEXCOORD_0 (float or normalized int)
+			// ─────────────────────────────────────────────
+			bool hasTexCoords = primitive.attributes.count("TEXCOORD_0") > 0;
+			const tinygltf::Accessor* uvAccessor = nullptr;
+			const tinygltf::BufferView* uvBufferView = nullptr;
+			const tinygltf::Buffer* uvBuffer = nullptr;
+			size_t uvStride = 0;
+
+			if (hasTexCoords) {
+				uvAccessor = &model.accessors[primitive.attributes.at("TEXCOORD_0")];
+				uvBufferView = &model.bufferViews[uvAccessor->bufferView];
+				uvBuffer = &model.buffers[uvBufferView->buffer];
+
+				if (uvAccessor->type != TINYGLTF_TYPE_VEC2)
+					throw std::runtime_error("TEXCOORD_0 must be VEC2");
+
+				if (uvBufferView->byteStride != 0) {
+					uvStride = uvBufferView->byteStride;
+				}
+				else {
+					switch (uvAccessor->componentType) {
+					case TINYGLTF_COMPONENT_TYPE_FLOAT:          uvStride = 2 * sizeof(float);   break;
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:  uvStride = 2 * sizeof(uint8_t); break;
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: uvStride = 2 * sizeof(uint16_t); break;
+					default:
+						throw std::runtime_error("Unsupported TEXCOORD_0 componentType");
+					}
+				}
+			}
+
+
+			// ─────────────────────────────────────────────
+			// COLOR_0 (float or normalized int)
+			// ─────────────────────────────────────────────
+			bool hasColors = primitive.attributes.count("COLOR_0");
 			const tinygltf::Accessor* colorAccessor = nullptr;
 			const tinygltf::BufferView* colorBufferView = nullptr;
 			const tinygltf::Buffer* colorBuffer = nullptr;
+			size_t colorStride = 0;
 
 			if (hasColors) {
-				colorAccessor = &model.accessors[primitive.attributes.at("COLOR")];
-				colorBufferView = &model.bufferViews[normalAccessor->bufferView];
-				colorBuffer = &model.buffers[normalBufferView->buffer];
-				std::printf("Color accessor count: %i\n", (int)normalAccessor->count);
-			};
+				colorAccessor = &model.accessors[primitive.attributes.at("COLOR_0")];
+				colorBufferView = &model.bufferViews[colorAccessor->bufferView];
+				colorBuffer = &model.buffers[colorBufferView->buffer];
 
-			uint32_t baseVertex = static_cast<uint32_t>(newMesh.vertices.size());
+				int comps = (colorAccessor->type == TINYGLTF_TYPE_VEC3 ? 3 :
+					colorAccessor->type == TINYGLTF_TYPE_VEC4 ? 4 : 0);
+				if (!comps) throw std::runtime_error("COLOR_0 must be VEC3 or VEC4");
 
-			for (size_t i = 0; i < posAccessor.count; i++)
-			{
-				Vertex vertex{};
-
-				const float* pos = reinterpret_cast<const float*>(&posBuffer.data[posBufferView.byteOffset + posAccessor.byteOffset + i * 12]);
-				// glTF uses a right-handed coordinate system with Y-up
-				// Vulkan uses a right-handed coordinate system with Y-down
-				// We need to flip the Y coordinate
-				vertex.pos = { pos[0], pos[2], -pos[1] };
-
-				if (hasTexCoords)
-				{
-					const float* texCoord = reinterpret_cast<const float*>(&texCoordBuffer->data[texCoordBufferView->byteOffset + texCoordAccessor->byteOffset + i * 8]);
-					vertex.texCoord = { texCoord[0], texCoord[1] };
+				if (colorBufferView->byteStride)
+					colorStride = colorBufferView->byteStride;
+				else {
+					switch (colorAccessor->componentType) {
+					case TINYGLTF_COMPONENT_TYPE_FLOAT:          colorStride = comps * 4; break;
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:  colorStride = comps * 1; break;
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: colorStride = comps * 2; break;
+					default: throw std::runtime_error("Unsupported COLOR_0 componentType");
+					}
 				}
-				else
-				{
-					vertex.texCoord = { 0.0f, 0.0f };
+			}
+
+			// ─────────────────────────────────────────────
+			// TANGENT (float only)
+			// ─────────────────────────────────────────────
+			bool hasTangents = primitive.attributes.count("TANGENT");
+			const tinygltf::Accessor* tanAccessor = nullptr;
+			const tinygltf::BufferView* tanBufferView = nullptr;
+			const tinygltf::Buffer* tanBuffer = nullptr;
+			size_t tanStride = 0;
+
+			if (hasTangents) {
+				tanAccessor = &model.accessors[primitive.attributes.at("TANGENT")];
+				if (tanAccessor->componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
+					throw std::runtime_error("TANGENT must be FLOAT");
+
+				tanBufferView = &model.bufferViews[tanAccessor->bufferView];
+				tanBuffer = &model.buffers[tanBufferView->buffer];
+				tanStride = tanBufferView->byteStride ?
+					tanBufferView->byteStride :
+					4 * sizeof(float);
+			}
+
+			// ─────────────────────────────────────────────
+			// Vertex loop
+			// ─────────────────────────────────────────────
+			uint32_t baseVertex = (uint32_t)newMesh.vertices.size();
+			newMesh.vertices.reserve(newMesh.vertices.size() + posAccessor.count);
+
+			for (size_t i = 0; i < posAccessor.count; ++i) {
+				Vertex v{};
+
+				// POSITION
+				const float* pos = reinterpret_cast<const float*>(
+					&posBuffer.data[posBufferView.byteOffset + posAccessor.byteOffset + i * posStride]);
+				v.pos = { pos[0], pos[2], -pos[1] };
+
+				// NORMAL
+				if (hasNormals) {
+					const float* n = reinterpret_cast<const float*>(
+						&normalBuffer->data[normalBufferView->byteOffset + normalAccessor->byteOffset + i * normalStride]);
+					v.normal = { n[0], n[2], -n[1] };
 				}
 
-				if (hasNormals)
-				{
-					const float* normal = reinterpret_cast<const float*>(&normalBuffer->data[normalBufferView->byteOffset + normalAccessor->byteOffset + i * 12]);
-					vertex.normal = { normal[0], normal[2], -normal[1] };
-				}
-				else
-				{
-					vertex.normal = { 0.0f, 0.0f, 0.0f };
-				}
-				if(hasColors)
-				{
-					const float* color = reinterpret_cast<const float*>(&colorBuffer->data[colorBufferView->byteOffset + colorAccessor->byteOffset + i * 16]);
-					vertex.color = { color[0], color[1], color[2] };
+				// TEXCOORD_0
+				if (hasTexCoords) {
+					const unsigned char* base = &uvBuffer->data[
+						uvBufferView->byteOffset +
+							uvAccessor->byteOffset +
+							i * uvStride
+					];
+
+					switch (uvAccessor->componentType) {
+					case TINYGLTF_COMPONENT_TYPE_FLOAT: {
+						const float* uv = reinterpret_cast<const float*>(base);
+						v.texCoord = { uv[0], uv[1] };
+						break;
+					}
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
+						const uint8_t* uv = reinterpret_cast<const uint8_t*>(base);
+						v.texCoord = {
+							uv[0] / 255.0f,
+							uv[1] / 255.0f
+						};
+						break;
+					}
+					case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
+						const uint16_t* uv = reinterpret_cast<const uint16_t*>(base);
+						v.texCoord = {
+							uv[0] / 65535.0f,
+							uv[1] / 65535.0f
+						};
+						break;
+					}
+					default:
+						v.texCoord = { 0.0f, 0.0f }; // should never hit due to earlier check
+						break;
+					}
 				}
 				else {
-					vertex.color = { 1.0f, 1.0f, 1.0f };
+					v.texCoord = { 0.0f, 0.0f };
 				}
-				newMesh.vertices.push_back(vertex);
+
+
+				// COLOR_0
+				if (hasColors) {
+					const unsigned char* base = &colorBuffer->data[
+						colorBufferView->byteOffset + colorAccessor->byteOffset + i * colorStride];
+
+					v.color.r = readFloat(base + 0 * (colorStride / (colorAccessor->type == TINYGLTF_TYPE_VEC4 ? 4 : 3)), colorAccessor->componentType);
+					v.color.g = readFloat(base + 1 * (colorStride / (colorAccessor->type == TINYGLTF_TYPE_VEC4 ? 4 : 3)), colorAccessor->componentType);
+					v.color.b = readFloat(base + 2 * (colorStride / (colorAccessor->type == TINYGLTF_TYPE_VEC4 ? 4 : 3)), colorAccessor->componentType);
+				}
+				else {
+					v.color = { 1,1,1 };
+				}
+
+				// TANGENT
+				if (hasTangents) {
+					const float* t = reinterpret_cast<const float*>(
+						&tanBuffer->data[tanBufferView->byteOffset + tanAccessor->byteOffset + i * tanStride]);
+					v.tangent = { t[0], t[2], -t[1], t[3] };
+				}
+
+				newMesh.vertices.push_back(v);
 			}
 
-			const unsigned char* indexData = &indexBuffer.data[indexBufferView.byteOffset + indexAccessor.byteOffset];
-			size_t               indexCount = indexAccessor.count;
-			size_t               indexStride = 0;
-
-			// Determine index stride based on component type
-			if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-			{
-				indexStride = sizeof(uint16_t);
-			}
-			else if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-			{
-				indexStride = sizeof(uint32_t);
-			}
-			else if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-			{
-				indexStride = sizeof(uint8_t);
-			}
-			else
-			{
-				throw std::runtime_error("Unsupported index component type");
-			}
-
+			// ─────────────────────────────────────────────
+			// Index loop
+			// ─────────────────────────────────────────────
 			newMesh.indices.reserve(newMesh.indices.size() + indexCount);
 
-			for (size_t i = 0; i < indexCount; i++)
-			{
-				uint32_t index = 0;
+			for (size_t i = 0; i < indexCount; ++i) {
+				uint32_t idx = 0;
+				const unsigned char* src = indexData + i * indexStride;
 
-				if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-				{
-					index = *reinterpret_cast<const uint16_t*>(indexData + i * indexStride);
-				}
-				else if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-				{
-					index = *reinterpret_cast<const uint32_t*>(indexData + i * indexStride);
-				}
-				else if (indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-				{
-					index = *reinterpret_cast<const uint8_t*>(indexData + i * indexStride);
+				switch (indexAccessor.componentType) {
+				case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: idx = *reinterpret_cast<const uint16_t*>(src); break;
+				case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:   idx = *reinterpret_cast<const uint32_t*>(src); break;
+				case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:  idx = *reinterpret_cast<const uint8_t*>(src);  break;
 				}
 
-				newMesh.indices.push_back(baseVertex + index);
+				newMesh.indices.push_back(baseVertex + idx);
 			}
-			// Set material
-			if (primitive.material >= 0) {
+
+			if (primitive.material >= 0)
 				newMesh.materialIndex = primitive.material;
-			}
 
-			// Add the processed mesh to the game object
 			newNode->meshes.push_back(newMesh);
 		}
 	}
-	// Process child nodes recursively
-	for (int childIndex : node.children) {
-		processNode(model, model.nodes[childIndex], newNode, baseDir);
-	}
-};
+
+	// ─────────────────────────────────────────────
+	// Recurse
+	// ─────────────────────────────────────────────
+	for (int child : node.children)
+		processNode(model, model.nodes[child], newNode, baseDir);
+}
+
 
 void createMeshBuffers(State* state, Node* node) {
 	for (Mesh& mesh : node->meshes) {
@@ -192,6 +333,103 @@ void createMeshBuffers(State* state, Node* node) {
 
 	for (Node* child : node->children) {
 		createMeshBuffers(state, child);
+	}
+}
+
+// Base type
+static void readTextureTransform(
+	const tinygltf::TextureInfo& info,
+	TextureTransform& out)
+{
+	out.texCoord = info.texCoord;
+
+	auto it = info.extensions.find("KHR_texture_transform");
+	if (it == info.extensions.end()) return;
+
+	const tinygltf::Value& ext = it->second;
+
+	if (ext.Has("offset")) {
+		const auto& arr = ext.Get("offset").Get<tinygltf::Value::Array>();
+		out.offset = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("scale")) {
+		const auto& arr = ext.Get("scale").Get<tinygltf::Value::Array>();
+		out.scale = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("rotation")) {
+		out.rotation = float(ext.Get("rotation").GetNumberAsDouble());
+	}
+	if (ext.Has("center")) {
+		const auto& arr = ext.Get("center").Get<tinygltf::Value::Array>();
+		out.center = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("texCoord")) {
+		out.texCoord = int(ext.Get("texCoord").GetNumberAsInt());
+	}
+}
+
+// NormalTextureInfo overload
+static void readTextureTransform(
+	const tinygltf::NormalTextureInfo& info,
+	TextureTransform& out)
+{
+	// NormalTextureInfo has .texCoord too
+	out.texCoord = info.texCoord;
+
+	auto it = info.extensions.find("KHR_texture_transform");
+	if (it == info.extensions.end()) return;
+
+	const tinygltf::Value& ext = it->second;
+
+	if (ext.Has("offset")) {
+		const auto& arr = ext.Get("offset").Get<tinygltf::Value::Array>();
+		out.offset = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("scale")) {
+		const auto& arr = ext.Get("scale").Get<tinygltf::Value::Array>();
+		out.scale = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("rotation")) {
+		out.rotation = float(ext.Get("rotation").GetNumberAsDouble());
+	}
+	if (ext.Has("center")) {
+		const auto& arr = ext.Get("center").Get<tinygltf::Value::Array>();
+		out.center = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("texCoord")) {
+		out.texCoord = int(ext.Get("texCoord").GetNumberAsInt());
+	}
+}
+
+// OcclusionTextureInfo overload
+static void readTextureTransform(
+	const tinygltf::OcclusionTextureInfo& info,
+	TextureTransform& out)
+{
+	out.texCoord = info.texCoord;
+
+	auto it = info.extensions.find("KHR_texture_transform");
+	if (it == info.extensions.end()) return;
+
+	const tinygltf::Value& ext = it->second;
+
+	if (ext.Has("offset")) {
+		const auto& arr = ext.Get("offset").Get<tinygltf::Value::Array>();
+		out.offset = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("scale")) {
+		const auto& arr = ext.Get("scale").Get<tinygltf::Value::Array>();
+		out.scale = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("rotation")) {
+		out.rotation = float(ext.Get("rotation").GetNumberAsDouble());
+	}
+	if (ext.Has("center")) {
+		const auto& arr = ext.Get("center").Get<tinygltf::Value::Array>();
+		out.center = glm::vec2(arr[0].GetNumberAsDouble(), arr[1].GetNumberAsDouble());
+	}
+	if (ext.Has("texCoord")) {
+		out.texCoord = int(ext.Get("texCoord").GetNumberAsInt());
 	}
 }
 
@@ -266,41 +504,73 @@ Model* modelLoad(State *state, std::string modelPath)
 				m.pbrMetallicRoughness.baseColorFactor[3]
 			);
 		}
+		// Alpha mode
+		if (m.alphaMode == "MASK")
+			mat.alphaMode = "MASK";
+		else if (m.alphaMode == "BLEND")
+			mat.alphaMode = "BLEND";
+		else
+			mat.alphaMode = "OPAQUE";
+
+		// Alpha cutoff
+		if (m.alphaCutoff > 0.0f)
+			mat.alphaCutoff = (float)m.alphaCutoff;
+
+		// Double-sided
+		mat.doubleSided = m.doubleSided;
 
 		// Base color texture
-		int baseIndex = m.pbrMetallicRoughness.baseColorTexture.index;
-		mat.baseColorTextureIndex =
-			(baseIndex >= 0 && baseIndex < textureToImage.size())
-			? textureToImage[baseIndex]
-			: -1;
+		if (m.pbrMetallicRoughness.baseColorTexture.index >= 0) {
+			mat.baseColorTextureIndex =
+				m.pbrMetallicRoughness.baseColorTexture.index;
 
-		// Metallic-Roughness texture
-		int mrIndex = m.pbrMetallicRoughness.metallicRoughnessTexture.index;
-		mat.metallicRoughnessTextureIndex =
-			(mrIndex >= 0 && mrIndex < textureToImage.size())
-			? textureToImage[mrIndex]
-			: -1;
+			readTextureTransform(
+				m.pbrMetallicRoughness.baseColorTexture,
+				mat.baseColorTransform
+			);
+		}
+
+		// Metallic-roughness texture
+		if (m.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0) {
+			mat.metallicRoughnessTextureIndex =
+				m.pbrMetallicRoughness.metallicRoughnessTexture.index;
+
+			readTextureTransform(
+				m.pbrMetallicRoughness.metallicRoughnessTexture,
+				mat.metallicRoughnessTransform
+			);
+		}
 
 		// Normal texture
-		int normalIndex = m.normalTexture.index;
-		mat.normalTextureIndex =
-			(normalIndex >= 0 && normalIndex < textureToImage.size())
-			? textureToImage[normalIndex]
-			: -1;
+		if (m.normalTexture.index >= 0) {
+			mat.normalTextureIndex = m.normalTexture.index;
+
+			readTextureTransform(
+				m.normalTexture,
+				mat.normalTransform
+			);
+		}
 
 		// Occlusion texture
-		int occIndex = m.occlusionTexture.index;
-		mat.occlusionTextureIndex =
-			(occIndex >= 0 && occIndex < textureToImage.size())
-			? textureToImage[occIndex]
-			: -1;
+		if (m.occlusionTexture.index >= 0) {
+			mat.occlusionTextureIndex = m.occlusionTexture.index;
+
+			readTextureTransform(
+				m.occlusionTexture,
+				mat.occlusionTransform
+			);
+		}
 
 		// Emissive texture
-		int emissiveIndex = m.emissiveTexture.index;
-		mat.emissiveTextureIndex =
-			(emissiveIndex >= 0 && emissiveIndex < textureToImage.size())
-			? textureToImage[emissiveIndex]
-			: -1;
+		if (m.emissiveTexture.index >= 0) {
+			mat.emissiveTextureIndex = m.emissiveTexture.index;
+
+			readTextureTransform(
+				m.emissiveTexture,
+				mat.emissiveTransform
+			);
+		}
+
 
 		// Scalars
 		mat.metallicFactor = m.pbrMetallicRoughness.metallicFactor;
@@ -391,92 +661,44 @@ void modelUnload(State* state) {
 	textureImageDestroy(state);
 }
 
-void createTextureDescriptorSets(State* state) {
-	Texture* fallbackTex = nullptr;
-	if (!state->scene.textures.empty()) {
-		fallbackTex = &state->scene.textures[0];
-	}
-
-	for (Texture& tex : state->scene.textures) {
-		VkDescriptorSetAllocateInfo allocInfo{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.descriptorPool = state->renderer.descriptorPool,
-			.descriptorSetCount = 1,
-			.pSetLayouts = &state->renderer.textureSetLayout
-		};
-
-		PANIC(
-			vkAllocateDescriptorSets(state->context.device, &allocInfo, &tex.descriptorSet),
-			"Failed to allocate texture descriptor set"
-		);
-
-		// For now, use the same image for all 5 bindings
-		std::array<VkDescriptorImageInfo, 5> infos{};
-		for (uint32_t i = 0; i < 5; ++i) {
-			infos[i] = {
-				.sampler = tex.textureSampler,
-				.imageView = tex.textureImageView,
-				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-			};
-		}
-
-		std::array<VkWriteDescriptorSet, 5> writes{};
-		for (uint32_t i = 0; i < 5; ++i) {
-			writes[i] = {
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = tex.descriptorSet,
-				.dstBinding = i,                         // 0..4
-				.descriptorCount = 1,
-				.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-				.pImageInfo = &infos[i]
-			};
-		}
-
-		vkUpdateDescriptorSets(
-			state->context.device,
-			static_cast<uint32_t>(writes.size()), writes.data(),
-			0, nullptr
-		);
-	}
-}
-
-
-void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh) {
+void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh)
+{
 	const Material& mat = state->scene.materials[mesh.materialIndex];
 
-	int texIndex = mat.baseColorTextureIndex;
+	auto resolveTex = [&](int index) -> const Texture&
+		{
+			if (index >= 0 && index < state->scene.textures.size())
+				return state->scene.textures[index];
+			return state->scene.textures[state->scene.defaultTextureIndex];
+		};
 
-	// If invalid, use fallback
-	if (texIndex < 0 || texIndex >= state->scene.textures.size()) {
-		texIndex = state->scene.defaultTextureIndex;
-	}
+	const Texture& baseTex = resolveTex(mat.baseColorTextureIndex);
 
-	const Texture& tex = state->scene.textures[texIndex];
-
+	// Bind descriptor set for this material (set = 1)
 	vkCmdBindDescriptorSets(
 		cmd,
 		VK_PIPELINE_BIND_POINT_GRAPHICS,
 		state->renderer.pipelineLayout,
 		1, // set = 1
 		1,
-		&tex.descriptorSet,
+		&mat.descriptorSet,
 		0,
 		nullptr
 	);
 
-
-	// Push constants for material factors
+	// Push constants
 	PushConstantBlock pcb{};
 	pcb.baseColorFactor = mat.baseColorFactor;
 	pcb.metallicFactor = mat.metallicFactor;
 	pcb.roughnessFactor = mat.roughnessFactor;
-	pcb.baseColorTextureSet = mat.baseColorTextureIndex;
-	pcb.physicalDescriptorTextureSet = mat.metallicRoughnessTextureIndex;
-	pcb.emissiveTextureSet = mat.emissiveTextureIndex;
-	pcb.normalTextureSet = mat.normalTextureIndex;
-	pcb.occlusionTextureSet = mat.occlusionTextureIndex;
-	pcb.alphaMask = 0.0f; // For simplicity, not handling alpha masking in this example
-	pcb.alphaMaskCutoff = 0.5f;
+
+	pcb.baseColorTextureSet = 0;
+	pcb.physicalDescriptorTextureSet = 1;
+	pcb.normalTextureSet = 2;
+	pcb.occlusionTextureSet = 3;
+	pcb.emissiveTextureSet = 4;
+	pcb.alphaMask = (mat.alphaMode == "MASK") ? 1.0f : 0.0f;
+	pcb.alphaMaskCutoff = mat.alphaCutoff;
 
 	vkCmdPushConstants(
 		cmd,
@@ -492,9 +714,9 @@ void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh) {
 	vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertexBuffer, offsets);
 	vkCmdBindIndexBuffer(cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-	// Draw
 	vkCmdDrawIndexed(cmd, mesh.indices.size(), 1, 0, 0, 0);
 }
+
 
 
 
@@ -532,7 +754,7 @@ void drawNode(State* state, VkCommandBuffer cmd, const Node* node) {
     }
 }
 
-void gatherDrawItems( const Node* root, const glm::vec3& camPos, const std::vector<Material>& materials, std::vector<DrawItem>& out){
+void gatherDrawItems(const Node* root, const glm::vec3& camPos, const std::vector<Material>& materials, std::vector<DrawItem>& out) {
 	std::function<void(const Node*)> recurse = [&](const Node* node) {
 
 		// FIX: extract translation from global matrix
@@ -547,18 +769,20 @@ void gatherDrawItems( const Node* root, const glm::vec3& camPos, const std::vect
 			if (mesh.materialIndex >= 0 && mesh.materialIndex < (int)materials.size()) {
 				const auto& mat = materials[mesh.materialIndex];
 
-				// Simple transparency rule
-				if (mat.baseColorFactor.a < 1.0f) {
+				if (mat.alphaMode == "BLEND")
 					isTransparent = true;
-				}
-			}
+				else if (mat.alphaMode == "MASK")
+					isTransparent = false; // still opaque, but alpha-tested
+				else if (mat.baseColorFactor.a < 1.0f)
+					isTransparent = true;
+			};
 
 			out.push_back({
 				.node = node,
 				.mesh = &mesh,
 				.distanceToCamera = dist,
 				.transparent = isTransparent
-			});
+				});
 
 		}
 
@@ -568,4 +792,3 @@ void gatherDrawItems( const Node* root, const glm::vec3& camPos, const std::vect
 	};
 	recurse(root);
 }
-

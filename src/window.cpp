@@ -164,7 +164,7 @@ void windowCreate(State* state) {
 	descriptorPoolCreate(state);
 
 	descriptorSetsCreate(state);        // global UBO set (set = 0)
-	createTextureDescriptorSets(state); // texture sets (set = 1)
+	createMaterialDescriptorSets(state); // texture sets (set = 1)
 
 	commandBufferGet(state);
 	commandBufferRecord(state);

@@ -13,7 +13,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/hash.hpp>
+
 #include <algorithm>
 #include <unordered_map>
 #include <chrono>
@@ -62,12 +64,12 @@ struct Vertex {
 
 		attributeDescriptions[3].binding = 0;
 		attributeDescriptions[3].location = 3;
-		attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[3].offset = offsetof(Vertex, normal);
 
 		attributeDescriptions[4].binding = 0;
 		attributeDescriptions[4].location = 4;
-		attributeDescriptions[4].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[4].offset = offsetof(Vertex, tangent);
 
 		return attributeDescriptions;
@@ -202,20 +204,60 @@ struct PushConstantBlock {
 	int emissiveTextureSet;               // Texture coordinate set for emission
 	float alphaMask;                      // Whether to use alpha masking
 	float alphaMaskCutoff;                // Alpha threshold for masking
+
+};
+
+struct TexTransformGPU {
+	glm::vec4 offset_scale;    // xy = offset, zw = scale
+	glm::vec4 rot_center_tex;  // x = rotation, y/z = center, w = texCoord (float)
+};
+
+struct MaterialGPU {
+	TexTransformGPU baseColorTT;
+	TexTransformGPU mrTT;
+	TexTransformGPU normalTT;
+	TexTransformGPU occlusionTT;
+	TexTransformGPU emissiveTT;
+};
+
+struct TextureTransform {
+	glm::vec2 offset = { 0,0 };
+	glm::vec2 scale = { 1,1 };
+	float rotation = 0.0f;
+	glm::vec2 center = { 0,0 };
+	int texCoord = 0;
 };
 
 struct Material {
-	glm::vec4 baseColorFactor = glm::vec4(1.0f);
-	float metallicFactor = 1.0f;
-	float roughnessFactor = 1.0f;
-	glm::vec3 emissiveFactor = glm::vec3(0.0f);
-
+	// glTF indices into scene.textures
 	int baseColorTextureIndex = -1;
 	int metallicRoughnessTextureIndex = -1;
 	int normalTextureIndex = -1;
 	int occlusionTextureIndex = -1;
 	int emissiveTextureIndex = -1;
+
+	// Per-texture transforms + texCoord selection
+	TextureTransform baseColorTransform;
+	TextureTransform metallicRoughnessTransform;
+	TextureTransform normalTransform;
+	TextureTransform occlusionTransform;
+	TextureTransform emissiveTransform;
+
+	// Existing stuff you already have
+	glm::vec4 baseColorFactor = glm::vec4(1.0f);
+	float     metallicFactor = 1.0f;
+	float     roughnessFactor = 1.0f;
+	glm::vec3 emissiveFactor = glm::vec3(0.0f);
+
+	std::string alphaMode = "OPAQUE";  // "OPAQUE", "MASK", "BLEND"
+	float alphaCutoff = 0.5f;          // Only used for MASK
+	bool doubleSided = false;
+
+	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+	VkBuffer       materialBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory materialMemory = VK_NULL_HANDLE;
 };
+
 
 struct Mesh {
 	std::vector<Vertex>   vertices;
@@ -238,7 +280,7 @@ struct Node {
 
 	// For animation
 	glm::vec3 translation = glm::vec3(0.0f);
-	glm::quat rotation = glm::quat(-1.0f, 0.0f, 0.0f, 0.0f);
+	glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 	glm::vec3 scale = glm::vec3(1.0f);
 
 	glm::mat4 getLocalMatrix() const {
@@ -475,7 +517,7 @@ typedef struct {
 
 
 
-typedef struct {
+struct Renderer {
 	//Sorting
 	std::vector<DrawItem> opaqueDrawItems;
 	std::vector<DrawItem> transparentDrawItems;
@@ -486,10 +528,10 @@ typedef struct {
 	VkFence *inFlightFence;
 	uint32_t frameIndex;
 
+	uint32_t descriptorPoolMultiplier = 2;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSetLayout textureSetLayout;
-	VkDescriptorSet descriptorSet;
-	VkDescriptorSet textureDescriptorSet;
+	std::vector<VkDescriptorSet> descriptorSets; 
 
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
@@ -511,7 +553,7 @@ typedef struct {
 	VkPipelineLayout transparencyPipelineLayout;
 	VkRenderPass transparencyRenderPass;
 	
-}Renderer;
+};
 
 typedef struct {
 	Config config;

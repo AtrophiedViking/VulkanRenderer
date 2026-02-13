@@ -20,6 +20,7 @@ void commandPoolDestroy(State* state);
 
 void descriptorPoolCreate(State* state);
 void descriptorSetsCreate(State* state);
+void createMaterialDescriptorSets(State* state);
 void descriptorPoolDestroy(State* state);
 
 void syncObjectsCreate(State* state);

@@ -236,16 +236,16 @@ void uniformBuffersUpdate(State* state) {
 	ubo.proj = proj;
 
 	// Lights
-	ubo.lightPositions[0] = glm::vec4(0.0f, 5.0f, 5.0f, 1.0f);
+	ubo.lightPositions[0] = glm::vec4(5.0f, 5.0f, 0.0f, 0.0f);
 	ubo.lightColors[0] = glm::vec4(300.0f, 300.0f, 300.0f, 1.0f);
 
-	ubo.lightPositions[1] = glm::vec4(-5.0f, 0.0f, 0.0f, 1.0f);
+	ubo.lightPositions[1] = glm::vec4(0.0f, 5.0f, 5.0f, 0.0f);
 	ubo.lightColors[1] = glm::vec4(0.0f, 0.0f, 300.0f, 1.0f);
 
-	ubo.lightPositions[2] = glm::vec4(5.0f, 0.0f, 0.0f, 1.0f);
+	ubo.lightPositions[2] = glm::vec4(5.0f, 0.0f, 5.0f, 0.0f);
 	ubo.lightColors[2] = glm::vec4(300.0f, 0.0f, 0.0f, 1.0f);
 
-	ubo.lightPositions[3] = glm::vec4(0.0f, -5.0f, 0.0f, 1.0f);
+	ubo.lightPositions[3] = glm::vec4(0.0f, 5.0f, 0.0f, 0.0f);
 	ubo.lightColors[3] = glm::vec4(0.0f, 300.0f, 0.0f, 1.0f);
 
 	// Camera position
@@ -314,7 +314,7 @@ void commandBufferRecord(State* state) {
 		state->renderer.pipelineLayout,
 		0, // firstSet = 0 → set 0
 		1,
-		&state->renderer.descriptorSet,
+		&state->renderer.descriptorSets[state->renderer.frameIndex],
 		0,
 		nullptr
 	);

@@ -4,8 +4,6 @@
 Model* modelLoad(State* state, std::string modelPath);
 void modelUnload(State* state);
 
-void createTextureDescriptorSets(State* state);
-
 void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh);
 
 void drawNode(State* state, VkCommandBuffer cmd, const Node* node);
