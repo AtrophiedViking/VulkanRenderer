@@ -187,8 +187,8 @@ struct UniformBufferObject {
 	glm::vec4 lightColors[4];     // RGB color and intensity
 	glm::vec4 camPos;             // Camera position for view-dependent effects
 
-	float exposure = 4.5f;         // Exposure for HDR rendering
-	float gamma = 2.2f;            // Gamma correction value
+	float exposure = 2.2f;         // Exposure for HDR rendering
+	float gamma = 1.0f;            // Gamma correction value
 	float prefilteredCubeMipLevels = 1.0f;  // For image-based lighting
 	float scaleIBLAmbient = 1.0f; // Scale factor for ambient lighting
 };

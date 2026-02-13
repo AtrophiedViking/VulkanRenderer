@@ -259,8 +259,12 @@ void main()
     vec3 color = ambient + Lo + emissive;
 
     // Tone mapping + gamma
+    
     color = vec3(1.0) - exp(-color * ubo.exposure);
     color = pow(color, vec3(1.0 / ubo.gamma));
+    
 
     outColor = vec4(color, baseColor.a);
 }
+
+

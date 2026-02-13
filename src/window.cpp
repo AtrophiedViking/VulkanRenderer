@@ -401,12 +401,11 @@ void updateFPS(State* state) {
 	frameCount++;
 
 	if (currentTime - lastTime >= 1.0) {
-		state->gui.io.Framerate = frameCount;   // store FPS somewhere in your state
+		state->gui.io.Framerate = frameCount; 
 		frameCount = 0;
 		lastTime = currentTime;
 	}
 }
-
 
 void processInput(State* state) {
 	// Calculate delta time

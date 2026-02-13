@@ -125,13 +125,13 @@ void guiInit(State* state) {
     style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.0, 0.0, 0.0, 0.85);
 	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.1, 0.1, 0.1, 0.75); // transparent background)
     style.Colors[ImGuiCol_Border] = ImVec4(0.15, 0.075, 0.025, 1.0);
-    style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.20, 0.20, 0.0, 0.85);
-	style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.15, 0.075, 0.025, 0.90);
-    style.Colors[ImGuiCol_Border] = ImVec4(0.15, 0.075, 0.025, 1.0);
-    style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.15, 0.075, 0.025, 0.0);
-    style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.20, 0.20, 0.0, 0.85);
-    style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.15, 0.075, 0.025, 0.90);
-	style.Colors[ImGuiCol_Text] = ImVec4(0.2f, 0.5f, 0.0f, 0.90);
+    style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.20f, 0.20f, 0.0f, 0.85f);
+	style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.15f, 0.075f, 0.025f, 0.90f);
+    style.Colors[ImGuiCol_Border] = ImVec4(0.15f, 0.075f, 0.025f, 1.0f);
+    style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.15f, 0.075f, 0.025f, 0.0f);
+    style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.20f, 0.20f, 0.0f, 0.85f);
+    style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.15f, 0.075f, 0.025f, 0.90f);
+	style.Colors[ImGuiCol_Text] = ImVec4(0.2f, 0.5f, 0.0f, 0.90f);
 	state->gui.style = style;
 }
 

@@ -252,8 +252,8 @@ void uniformBuffersUpdate(State* state) {
 	ubo.camPos = glm::vec4(state->scene.camera.getPosition(), 1.0f);
 
 	// PBR params
-	ubo.exposure = 4.5f;
-	ubo.gamma = 2.2f;
+	ubo.exposure = 1.0f;
+	ubo.gamma = 1.5f;
 	ubo.prefilteredCubeMipLevels = 1.0f;
 	ubo.scaleIBLAmbient = 1.0f;
 
