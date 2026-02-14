@@ -4,6 +4,7 @@
 // Push Constants (glTF material semantics)
 // ─────────────────────────────────────────────
 layout(push_constant) uniform PushConstants {
+    mat4 nodeMatrix;   
     vec4  baseColorFactor;
     float metallicFactor;
     float roughnessFactor;

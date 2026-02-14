@@ -5,7 +5,7 @@
 #include <tiny_gltf.h>
 #include "headers/models.h"
 //utility
-static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* parent, const std::string& baseDir)
+static void processNode(tinygltf::Model& gltfModel, tinygltf::Node& node, Node* parent, const std::string& baseDir, Model& model)
 {
 	Node* newNode = new Node();
 	newNode->name = node.name;
@@ -13,6 +13,7 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 	// ─────────────────────────────────────────────
 	// Node transform
 	// ─────────────────────────────────────────────
+
 	if (!node.matrix.empty()) {
 		newNode->matrix = glm::make_mat4(node.matrix.data());
 		newNode->translation = glm::vec3(0.0f);
@@ -56,7 +57,7 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 	// Process mesh
 	// ─────────────────────────────────────────────
 	if (node.mesh >= 0) {
-		const tinygltf::Mesh& mesh = model.meshes[node.mesh];
+		const tinygltf::Mesh& mesh = gltfModel.meshes[node.mesh];
 
 		for (const auto& primitive : mesh.primitives) {
 			Mesh newMesh;
@@ -64,9 +65,9 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 			// ─────────────────────────────────────────────
 			// Index buffer
 			// ─────────────────────────────────────────────
-			const auto& indexAccessor = model.accessors[primitive.indices];
-			const auto& indexBufferView = model.bufferViews[indexAccessor.bufferView];
-			const auto& indexBuffer = model.buffers[indexBufferView.buffer];
+			const auto& indexAccessor = gltfModel.accessors[primitive.indices];
+			const auto& indexBufferView = gltfModel.bufferViews[indexAccessor.bufferView];
+			const auto& indexBuffer = gltfModel.buffers[indexBufferView.buffer];
 
 			size_t indexCount = indexAccessor.count;
 
@@ -84,9 +85,9 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 			// ─────────────────────────────────────────────
 			// POSITION (float only)
 			// ─────────────────────────────────────────────
-			const auto& posAccessor = model.accessors[primitive.attributes.at("POSITION")];
-			const auto& posBufferView = model.bufferViews[posAccessor.bufferView];
-			const auto& posBuffer = model.buffers[posBufferView.buffer];
+			const auto& posAccessor = gltfModel.accessors[primitive.attributes.at("POSITION")];
+			const auto& posBufferView = gltfModel.bufferViews[posAccessor.bufferView];
+			const auto& posBuffer = gltfModel.buffers[posBufferView.buffer];
 
 			if (posAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
 				throw std::runtime_error("POSITION must be FLOAT");
@@ -105,12 +106,12 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 			size_t normalStride = 0;
 
 			if (hasNormals) {
-				normalAccessor = &model.accessors[primitive.attributes.at("NORMAL")];
+				normalAccessor = &gltfModel.accessors[primitive.attributes.at("NORMAL")];
 				if (normalAccessor->componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
 					throw std::runtime_error("NORMAL must be FLOAT");
 
-				normalBufferView = &model.bufferViews[normalAccessor->bufferView];
-				normalBuffer = &model.buffers[normalBufferView->buffer];
+				normalBufferView = &gltfModel.bufferViews[normalAccessor->bufferView];
+				normalBuffer = &gltfModel.buffers[normalBufferView->buffer];
 				normalStride = normalBufferView->byteStride ?
 					normalBufferView->byteStride :
 					3 * sizeof(float);
@@ -125,9 +126,9 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 			size_t uvStride = 0;
 
 			if (hasTexCoords) {
-				uvAccessor = &model.accessors[primitive.attributes.at("TEXCOORD_0")];
-				uvBufferView = &model.bufferViews[uvAccessor->bufferView];
-				uvBuffer = &model.buffers[uvBufferView->buffer];
+				uvAccessor = &gltfModel.accessors[primitive.attributes.at("TEXCOORD_0")];
+				uvBufferView = &gltfModel.bufferViews[uvAccessor->bufferView];
+				uvBuffer = &gltfModel.buffers[uvBufferView->buffer];
 
 				if (uvAccessor->type != TINYGLTF_TYPE_VEC2)
 					throw std::runtime_error("TEXCOORD_0 must be VEC2");
@@ -157,9 +158,9 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 			size_t colorStride = 0;
 
 			if (hasColors) {
-				colorAccessor = &model.accessors[primitive.attributes.at("COLOR_0")];
-				colorBufferView = &model.bufferViews[colorAccessor->bufferView];
-				colorBuffer = &model.buffers[colorBufferView->buffer];
+				colorAccessor = &gltfModel.accessors[primitive.attributes.at("COLOR_0")];
+				colorBufferView = &gltfModel.bufferViews[colorAccessor->bufferView];
+				colorBuffer = &gltfModel.buffers[colorBufferView->buffer];
 
 				int comps = (colorAccessor->type == TINYGLTF_TYPE_VEC3 ? 3 :
 					colorAccessor->type == TINYGLTF_TYPE_VEC4 ? 4 : 0);
@@ -187,12 +188,12 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 			size_t tanStride = 0;
 
 			if (hasTangents) {
-				tanAccessor = &model.accessors[primitive.attributes.at("TANGENT")];
+				tanAccessor = &gltfModel.accessors[primitive.attributes.at("TANGENT")];
 				if (tanAccessor->componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
 					throw std::runtime_error("TANGENT must be FLOAT");
 
-				tanBufferView = &model.bufferViews[tanAccessor->bufferView];
-				tanBuffer = &model.buffers[tanBufferView->buffer];
+				tanBufferView = &gltfModel.bufferViews[tanAccessor->bufferView];
+				tanBuffer = &gltfModel.buffers[tanBufferView->buffer];
 				tanStride = tanBufferView->byteStride ?
 					tanBufferView->byteStride :
 					4 * sizeof(float);
@@ -301,7 +302,8 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 			}
 
 			if (primitive.material >= 0)
-				newMesh.materialIndex = primitive.material;
+				newMesh.materialIndex = model.baseMaterialIndex + primitive.material;
+
 
 			newNode->meshes.push_back(newMesh);
 		}
@@ -311,7 +313,7 @@ static void processNode(tinygltf::Model& model, tinygltf::Node& node, Node* pare
 	// Recurse
 	// ─────────────────────────────────────────────
 	for (int child : node.children)
-		processNode(model, model.nodes[child], newNode, baseDir);
+		processNode(gltfModel, gltfModel.nodes[child], newNode, baseDir, model);
 }
 
 
@@ -438,7 +440,9 @@ static void readTextureTransform(
 Model* modelLoad(State *state, std::string modelPath)
 {
 	// Use tinygltf to load the model instead of tinyobjloader
-	Model* model = new Model();
+	state->scene.models.emplace_back();
+	Model& model = state->scene.models.back();
+
 	tinygltf::Model    gltfModel;
 	tinygltf::TinyGLTF loader;
 	std::string        err;
@@ -473,8 +477,8 @@ Model* modelLoad(State *state, std::string modelPath)
 	{
 		throw std::runtime_error("Failed to load glTF model");
 	}
-	state->scene.rootNode = new Node();
-	state->scene.rootNode->name = "Root";
+	model.rootNode = new Node();
+	model.rootNode->name = "Root";
 
 	std::vector<int> textureToImage;
 	textureToImage.reserve(gltfModel.textures.size());
@@ -489,7 +493,8 @@ Model* modelLoad(State *state, std::string modelPath)
 		baseDir = modelPath.substr(0, lastSlashPos + 1);
 	};
 
-	state->scene.materials.clear();
+	model.baseMaterialIndex = static_cast<uint32_t>(state->scene.materials.size());
+	model.baseTextureIndex = static_cast<uint32_t>(state->scene.textures.size());
 	state->scene.materials.reserve(gltfModel.materials.size());
 
 	for (const auto& m : gltfModel.materials) {
@@ -522,7 +527,7 @@ Model* modelLoad(State *state, std::string modelPath)
 		// Base color texture
 		if (m.pbrMetallicRoughness.baseColorTexture.index >= 0) {
 			mat.baseColorTextureIndex =
-				m.pbrMetallicRoughness.baseColorTexture.index;
+				model.baseTextureIndex + m.pbrMetallicRoughness.baseColorTexture.index;
 
 			readTextureTransform(
 				m.pbrMetallicRoughness.baseColorTexture,
@@ -533,7 +538,7 @@ Model* modelLoad(State *state, std::string modelPath)
 		// Metallic-roughness texture
 		if (m.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0) {
 			mat.metallicRoughnessTextureIndex =
-				m.pbrMetallicRoughness.metallicRoughnessTexture.index;
+				model.baseTextureIndex + m.pbrMetallicRoughness.metallicRoughnessTexture.index;
 
 			readTextureTransform(
 				m.pbrMetallicRoughness.metallicRoughnessTexture,
@@ -543,7 +548,8 @@ Model* modelLoad(State *state, std::string modelPath)
 
 		// Normal texture
 		if (m.normalTexture.index >= 0) {
-			mat.normalTextureIndex = m.normalTexture.index;
+			mat.normalTextureIndex = 
+				model.baseTextureIndex + m.normalTexture.index;
 
 			readTextureTransform(
 				m.normalTexture,
@@ -553,7 +559,8 @@ Model* modelLoad(State *state, std::string modelPath)
 
 		// Occlusion texture
 		if (m.occlusionTexture.index >= 0) {
-			mat.occlusionTextureIndex = m.occlusionTexture.index;
+			mat.occlusionTextureIndex = 
+				model.baseTextureIndex + m.occlusionTexture.index;
 
 			readTextureTransform(
 				m.occlusionTexture,
@@ -563,7 +570,8 @@ Model* modelLoad(State *state, std::string modelPath)
 
 		// Emissive texture
 		if (m.emissiveTexture.index >= 0) {
-			mat.emissiveTextureIndex = m.emissiveTexture.index;
+			mat.emissiveTextureIndex = 
+				model.baseTextureIndex + m.emissiveTexture.index;
 
 			readTextureTransform(
 				m.emissiveTexture,
@@ -586,12 +594,11 @@ Model* modelLoad(State *state, std::string modelPath)
 		// (Implementation of node processing is omitted for brevity)
 		tinygltf::Node node = gltfModel.nodes[nodeIndex];
 		std::cout << "Loaded node: " << node.name << std::endl;
-		processNode(gltfModel, node, state->scene.rootNode, baseDir);
+		processNode(gltfModel, node, model.rootNode, baseDir, model);
 		gltfModel.nodes[nodeIndex] = node; // Update the node in the model with any changes made during processing
 	}
 
-	createMeshBuffers(state, state->scene.rootNode);
-
+	createMeshBuffers(state, model.rootNode);
 
 	if (!gltfModel.images.empty()) {
 		for (const auto& image : gltfModel.images) {
@@ -624,44 +631,81 @@ Model* modelLoad(State *state, std::string modelPath)
 		state->scene.textures.push_back(tex);
 	}
 
-	state->scene.models.push_back(*model);
-	return model;
+	return &model;
 }
 
-void modelUnload(State* state) {
-	// Clean up mesh buffers
-	std::function<void(Node*)> cleanupNode = [&](Node* node) {
-		for (Mesh& mesh : node->meshes) {
-			if (mesh.vertexBuffer != VK_NULL_HANDLE) {
-				vkDestroyBuffer(state->context.device, mesh.vertexBuffer, nullptr);
-				mesh.vertexBuffer = VK_NULL_HANDLE;
+void modelUnload(State* state)
+{
+	// 1. Destroy mesh buffers for every node in every model
+	std::function<void(Node*)> cleanupNode = [&](Node* node)
+		{
+			for (Mesh& mesh : node->meshes)
+			{
+				if (mesh.vertexBuffer) {
+					vkDestroyBuffer(state->context.device, mesh.vertexBuffer, nullptr);
+					mesh.vertexBuffer = VK_NULL_HANDLE;
+				}
+				if (mesh.vertexMemory) {
+					vkFreeMemory(state->context.device, mesh.vertexMemory, nullptr);
+					mesh.vertexMemory = VK_NULL_HANDLE;
+				}
+				if (mesh.indexBuffer) {
+					vkDestroyBuffer(state->context.device, mesh.indexBuffer, nullptr);
+					mesh.indexBuffer = VK_NULL_HANDLE;
+				}
+				if (mesh.indexMemory) {
+					vkFreeMemory(state->context.device, mesh.indexMemory, nullptr);
+					mesh.indexMemory = VK_NULL_HANDLE;
+				}
 			}
-			if (mesh.vertexMemory != VK_NULL_HANDLE) {
-				vkFreeMemory(state->context.device, mesh.vertexMemory, nullptr);
-				mesh.vertexMemory = VK_NULL_HANDLE;
-			}
-			if (mesh.indexBuffer != VK_NULL_HANDLE) {
-				vkDestroyBuffer(state->context.device, mesh.indexBuffer, nullptr);
-				mesh.indexBuffer = VK_NULL_HANDLE;
-			}
-			if (mesh.indexMemory != VK_NULL_HANDLE) {
-				vkFreeMemory(state->context.device, mesh.indexMemory, nullptr);
-				mesh.indexMemory = VK_NULL_HANDLE;
-			}
-		}
-		for (Node* child : node->children) {
-			cleanupNode(child);
-		}
-	};
-	if (state->scene.rootNode) {
-		cleanupNode(state->scene.rootNode);
-		delete state->scene.rootNode;
-		state->scene.rootNode = nullptr;
+
+			for (Node* child : node->children)
+				if (child) cleanupNode(child);
+		};
+
+	// 2. Walk each model's node tree and clean GPU buffers ONLY
+	for (Model& model : state->scene.models)
+	{
+		if (model.rootNode)
+			cleanupNode(model.rootNode);
 	}
+
+	// 3. Clear models – this calls ~Model and deletes all nodes in linearNodes
+	state->scene.models.clear();
+
+	// 4. Destroy global material UBOs
+	for (Material& mat : state->scene.materials)
+	{
+		if (mat.materialBuffer) {
+			vkDestroyBuffer(state->context.device, mat.materialBuffer, nullptr);
+			mat.materialBuffer = VK_NULL_HANDLE;
+		}
+		if (mat.materialMemory) {
+			vkFreeMemory(state->context.device, mat.materialMemory, nullptr);
+			mat.materialMemory = VK_NULL_HANDLE;
+		}
+	}
+	state->scene.materials.clear();
+
+	// 5. Destroy global textures
+	for (Texture& tex : state->scene.textures)
+	{
+		if (tex.textureImageView)
+			vkDestroyImageView(state->context.device, tex.textureImageView, nullptr);
+		if (tex.textureSampler)
+			vkDestroySampler(state->context.device, tex.textureSampler, nullptr);
+		if (tex.textureImage)
+			vkDestroyImage(state->context.device, tex.textureImage, nullptr);
+		if (tex.textureImageMemory)
+			vkFreeMemory(state->context.device, tex.textureImageMemory, nullptr);
+	}
+	state->scene.textures.clear();
+
+	// 6. Fallback texture if you still use one
 	textureImageDestroy(state);
 }
 
-void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh)
+void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh, const glm::mat4& nodeMatrix, const glm::mat4& modelTransform)
 {
 	const Material& mat = state->scene.materials[mesh.materialIndex];
 
@@ -688,6 +732,7 @@ void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh)
 
 	// Push constants
 	PushConstantBlock pcb{};
+	pcb.nodeMatrix = modelTransform * nodeMatrix;
 	pcb.baseColorFactor = mat.baseColorFactor;
 	pcb.metallicFactor = mat.metallicFactor;
 	pcb.roughnessFactor = mat.roughnessFactor;
@@ -720,40 +765,21 @@ void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh)
 
 
 
-void drawNode(State* state, VkCommandBuffer cmd, const Node* node) {
-	PushConstantBlock pushConstantBlock{
-			.baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f},
-			.metallicFactor = 1.0f,
-			.roughnessFactor = 0.5f,
-			.baseColorTextureSet = 0,
-			.physicalDescriptorTextureSet = 1,
-			.normalTextureSet = 2,
-			.occlusionTextureSet = 3,
-			.emissiveTextureSet = 4,
-			.alphaMask = 0.0f,
-			.alphaMaskCutoff = 0.5f
-	};
-    // Push node transform (if you want)
-    glm::mat4 modelMatrix = node->getGlobalMatrix();
-	vkCmdPushConstants(cmd,
-		state->renderer.pipelineLayout,
-		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-		0,
-		sizeof(PushConstantBlock),
-		&pushConstantBlock
-    );
+void drawNode(State* state,
+	VkCommandBuffer cmd,
+	const Node* node,
+	const glm::mat4& modelTransform)
+{
+	glm::mat4 nodeMatrix = node->getGlobalMatrix();
 
-    // Draw all meshes in this node
-    for (const Mesh& mesh : node->meshes) {
-        drawMesh(state, cmd, mesh);
-    }
+	for (const Mesh& mesh : node->meshes) {
+		drawMesh(state, cmd, mesh, nodeMatrix, modelTransform);
+	}
 
-    // Recurse
-    for (const Node* child : node->children) {
-        drawNode(state, cmd, child);
-    }
+	for (const Node* child : node->children) {
+		drawNode(state, cmd, child, modelTransform);
+	}
 }
-
 void gatherDrawItems(const Node* root, const glm::vec3& camPos, const std::vector<Material>& materials, std::vector<DrawItem>& out) {
 	std::function<void(const Node*)> recurse = [&](const Node* node) {
 

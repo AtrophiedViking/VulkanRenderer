@@ -280,7 +280,8 @@ void commandBufferGet(State* state) {
 	state->buffers.commandBuffer = (VkCommandBuffer*)malloc(state->config.swapchainBuffering * sizeof(VkCommandBuffer));
 	PANIC(vkAllocateCommandBuffers(state->context.device, &allocInfo, state->buffers.commandBuffer), "Failed To Create Command Buffer");
 };
-void commandBufferRecord(State* state) {
+void commandBufferRecord(State* state)
+{
 	VkCommandBuffer cmd = state->buffers.commandBuffer[state->renderer.frameIndex];
 
 	VkCommandBufferBeginInfo beginInfo{
@@ -305,19 +306,6 @@ void commandBufferRecord(State* state) {
 	};
 
 	vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.graphicsPipeline);
-
-	// Bind global UBO (set = 0), NOT a texture
-	vkCmdBindDescriptorSets(
-		cmd,
-		VK_PIPELINE_BIND_POINT_GRAPHICS,
-		state->renderer.pipelineLayout,
-		0, // firstSet = 0 → set 0
-		1,
-		&state->renderer.descriptorSets[state->renderer.frameIndex],
-		0,
-		nullptr
-	);
 
 	VkViewport viewport{
 		.x = 0.0f,
@@ -335,71 +323,96 @@ void commandBufferRecord(State* state) {
 	};
 	vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-	PushConstantBlock pushConstants{};
-	pushConstants.baseColorFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
-	pushConstants.metallicFactor = 1.0f;
-	pushConstants.roughnessFactor = 0.5f;
-	pushConstants.baseColorTextureSet = 0;
-	pushConstants.physicalDescriptorTextureSet = 1;
-	pushConstants.normalTextureSet = 2;
-	pushConstants.occlusionTextureSet = 3;
-	pushConstants.emissiveTextureSet = 4;
-	pushConstants.alphaMask = 0.0f;
-	pushConstants.alphaMaskCutoff = 0.5f;
-	
-	vkCmdPushConstants(
+	// Bind global UBO (set = 0)
+	vkCmdBindDescriptorSets(
 		cmd,
+		VK_PIPELINE_BIND_POINT_GRAPHICS,
 		state->renderer.pipelineLayout,
-		VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 		0,
-		sizeof(PushConstantBlock),
-		&pushConstants
+		1,
+		&state->renderer.descriptorSets[state->renderer.frameIndex],
+		0,
+		nullptr
 	);
 
-	// Textures (set 1) are bound inside drawMesh per material
-	// 1. Gather draw items
-	std::vector<DrawItem> items;
-	gatherDrawItems(
-		state->scene.rootNode,
-		state->scene.camera.getPosition(),
-		state->scene.materials,
-		items
-	);
+	// ─────────────────────────────────────────────
+	// Per-model loop
+	// ─────────────────────────────────────────────
+	for (Model& model : state->scene.models)
+	{
+		// 1. Update UBO with per-model transform
+		UniformBufferObject ubo =
+			*reinterpret_cast<UniformBufferObject*>(
+				state->renderer.uniformBuffersMapped[state->renderer.frameIndex]
+				);
 
-	// 2. Split opaque and transparent
-	std::vector<DrawItem> opaqueItems;
-	std::vector<DrawItem> transparentItems;
+		ubo.model = model.transform;   // per-model matrix
 
-	for (const DrawItem& item : items) {
-		if (item.transparent)
-			transparentItems.push_back(item);
-		else
-			opaqueItems.push_back(item);
+		memcpy(
+			state->renderer.uniformBuffersMapped[state->renderer.frameIndex],
+			&ubo,
+			sizeof(UniformBufferObject)
+		);
+
+		// 2. Gather draw items for THIS model
+		std::vector<DrawItem> items;
+		gatherDrawItems(
+			model.rootNode,
+			state->scene.camera.getPosition(),
+			state->scene.materials,
+			items
+		);
+
+		// 3. Split opaque / transparent (local vectors)
+		std::vector<DrawItem> opaqueItems;
+		std::vector<DrawItem> transparentItems;
+
+		for (const DrawItem& item : items) {
+			if (item.transparent)
+				transparentItems.push_back(item);
+			else
+				opaqueItems.push_back(item);
+		}
+
+		// 4. Draw opaque with main pipeline
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.graphicsPipeline);
+		for (const DrawItem& item : opaqueItems) {
+			glm::mat4 nodeMatrix = item.node->getGlobalMatrix();
+			drawMesh(
+				state,
+				cmd,
+				*item.mesh,
+				item.node->getGlobalMatrix(),
+				model.transform
+			);
+		}
+
+		// 5. Sort transparent back-to-front
+		std::sort(
+			transparentItems.begin(), transparentItems.end(),
+			[](const DrawItem& a, const DrawItem& b) {
+				return a.distanceToCamera > b.distanceToCamera;
+			}
+		);
+
+		// 6. Draw transparent with transparency pipeline
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.transparencyPipeline);
+		for (const DrawItem& item : transparentItems) {
+			glm::mat4 nodeMatrix = item.node->getGlobalMatrix();
+			drawMesh(
+				state,
+				cmd,
+				*item.mesh,
+				item.node->getGlobalMatrix(),
+				model.transform
+			);
+		}
 	}
 
-	// 3. Draw opaque (no sorting needed)
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.graphicsPipeline);
-
-	for (const DrawItem& item : opaqueItems) {
-		drawMesh(state, cmd, *item.mesh);
-	}
-
-	// 4. Sort transparent back-to-front
-	std::sort(transparentItems.begin(), transparentItems.end(),
-		[](const DrawItem& a, const DrawItem& b) {
-			return a.distanceToCamera > b.distanceToCamera; // far → near
-		});
-
-	// 5. Draw transparent with transparency pipeline
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->renderer.transparencyPipeline);
-
-	for (const DrawItem& item : transparentItems) {
-		drawMesh(state, cmd, *item.mesh);
-	}
 	vkCmdEndRenderPass(cmd);
-
 
 	guiDraw(state, cmd);
 
 	PANIC(vkEndCommandBuffer(cmd), "Failed To Record Command Buffer");
 }
+

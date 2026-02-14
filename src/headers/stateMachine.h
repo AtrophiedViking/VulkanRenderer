@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include <signal.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/epsilon.hpp>
+#include <glm/gtc/matrix_access.hpp> 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -194,6 +196,7 @@ struct UniformBufferObject {
 };
 
 struct PushConstantBlock {
+	glm::mat4 nodeMatrix;
 	glm::vec4 baseColorFactor;            // RGB base color and alpha
 	float metallicFactor;                 // How metallic the surface is
 	float roughnessFactor;                // How rough the surface is
@@ -283,22 +286,41 @@ struct Node {
 	glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 	glm::vec3 scale = glm::vec3(1.0f);
 
+
+	bool hasBakedMatrix() const {
+		const float eps = 1e-6f;
+		glm::mat4 identity(1.0f);
+
+		for (int r = 0; r < 4; r++) {
+			for (int c = 0; c < 4; c++) {
+				if (fabs(matrix[r][c] - identity[r][c]) > eps)
+					return true; // matrix differs from identity
+			}
+		}
+		return false; // matrix is effectively identity
+	}
+
+
 	glm::mat4 getLocalMatrix() const {
-		return glm::translate(glm::mat4(1.0f), translation) *
-			glm::toMat4(rotation) *
-			glm::scale(glm::mat4(1.0f), scale) *
-			matrix;
-	};
+		// If glTF provided a meaningful baked matrix, use it
+		if (hasBakedMatrix()) {
+			return matrix;
+		}
+
+		glm::mat4 T = glm::translate(glm::mat4(1.0f), translation);
+		glm::mat4 R = glm::mat4_cast(rotation);
+		glm::mat4 S = glm::scale(glm::mat4(1.0f), scale);
+		return T * R * S;
+	}
 
 	glm::mat4 getGlobalMatrix() const {
-		glm::mat4 m = getLocalMatrix();
-		Node* p = parent;
-		while (p) {
-			m = p->getLocalMatrix() * m;
-			p = p->parent;
-		}
-		return m;
+		if (parent)
+			return parent->getGlobalMatrix() * getLocalMatrix();
+		else
+			return getLocalMatrix();
 	}
+
+
 };
 
 // Structure for animation keyframes
@@ -331,14 +353,61 @@ struct Animation {
 struct Model {
 	std::string name;
 	std::vector<Node*> nodes;
+	Node* rootNode = nullptr;
 	std::vector<Node*> linearNodes;
 	std::vector<Animation> animations;
 	glm::mat4 transform = glm::mat4(1.0f);
+
+	uint32_t baseMaterialIndex = 0;
+	uint32_t baseTextureIndex = 0;
 
 	~Model() {
 		for (auto node : linearNodes) {
 			delete node;
 		}
+	}
+
+	void translate(const glm::vec3& delta) {
+		transform = glm::translate(transform, delta);
+	}
+
+	void rotateEuler(const glm::vec3& eulerDegrees) {
+		glm::vec3 r = glm::radians(eulerDegrees);
+		glm::quat q = glm::quat(r);
+		transform = transform * glm::mat4_cast(q);
+	}
+
+	void scaleBy(const glm::vec3& s) {
+		transform = transform * glm::scale(glm::mat4(1.0f), s);
+	}
+
+	void setPosition(const glm::vec3& pos) {
+		transform = glm::translate(glm::mat4(1.0f), pos);
+	}
+
+	void setScale(const glm::vec3& s) {
+		transform = glm::scale(glm::mat4(1.0f), s);
+	}
+
+	void setUniformScale(float s) {
+		transform = glm::scale(glm::mat4(1.0f), glm::vec3(s));
+	}
+
+	void setRotationEuler(const glm::vec3& eulerDegrees) {
+		glm::vec3 r = glm::radians(eulerDegrees);
+		glm::quat q = glm::quat(r);
+		transform = glm::mat4_cast(q);
+	}
+
+	void setTransform(const glm::vec3& pos,
+		const glm::vec3& eulerDegrees,
+		const glm::vec3& scale)
+	{
+		glm::mat4 T = glm::translate(glm::mat4(1.0f), pos);
+		glm::mat4 R = glm::mat4_cast(glm::quat(glm::radians(eulerDegrees)));
+		glm::mat4 S = glm::scale(glm::mat4(1.0f), scale);
+
+		transform = T * R * S;
 	}
 
 	Node* findNode(const std::string& name) {
@@ -424,7 +493,6 @@ struct DrawItem {
 
 
 struct Scene {
-	Node* rootNode = nullptr;
 	int defaultTextureIndex = 0;
 
 	std::vector<Model> models;
@@ -455,6 +523,8 @@ typedef struct {
 	VkSampleCountFlagBits msaaSamples;
 	const std::string KOBOLD_TEXTURE_PATH;
 	const std::string KOBOLD_MODEL_PATH;
+	const std::string HOVER_BIKE_MODEL_PATH;
+	const std::string MODEL_PATH;
 
 }Config;
 

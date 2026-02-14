@@ -4,7 +4,11 @@
 Model* modelLoad(State* state, std::string modelPath);
 void modelUnload(State* state);
 
-void drawMesh(State* state, VkCommandBuffer cmd, const Mesh& mesh);
+void drawMesh(State* state,
+    VkCommandBuffer cmd,
+    const Mesh& mesh,
+    const glm::mat4& nodeMatrix,
+    const glm::mat4& modelTransform);
 
 void drawNode(State* state, VkCommandBuffer cmd, const Node* node);
 

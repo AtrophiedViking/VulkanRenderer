@@ -1,6 +1,7 @@
 #version 450
 
 layout(push_constant) uniform PushConstants {
+    mat4 nodeMatrix;
     vec4 baseColorFactor;
     float metallicFactor;
     float roughnessFactor;
@@ -48,21 +49,21 @@ layout(location = 4) out vec3 fragTangent;
 layout(location = 5) out vec3 fragBitangent;
 
 void main() {
-    // World-space position
-    vec4 worldPos = ubo.model * vec4(inPosition, 1.0);
+    mat4 modelNode = pc.nodeMatrix;
+
+    vec4 worldPos = modelNode * vec4(inPosition, 1.0);
     fragWorldPos = worldPos.xyz;
 
-    // Transform normal and tangent to world space
-    mat3 normalMatrix = transpose(inverse(mat3(ubo.model)));
+    mat3 normalMatrix = transpose(inverse(mat3(modelNode)));
     vec3 N = normalize(normalMatrix * inNormal);
     vec3 T = normalize(normalMatrix * inTangent.xyz);
     vec3 B = cross(N, T) * inTangent.w;
 
-    fragNormal = N;
-    fragTangent = T;
+    fragNormal   = N;
+    fragTangent  = T;
     fragBitangent = B;
 
-    fragColorVS = inColor;
+    fragColorVS    = inColor;
     fragTexCoordVS = inTexCoord;
 
     gl_Position = ubo.proj * ubo.view * worldPos;

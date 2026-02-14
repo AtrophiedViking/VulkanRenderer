@@ -158,6 +158,26 @@ void windowCreate(State* state) {
 
 	// Load model + textures BEFORE descriptor sets
 	modelLoad(state, state->config.KOBOLD_MODEL_PATH);
+	modelLoad(state, state->config.HOVER_BIKE_MODEL_PATH);
+	modelLoad(state, state->config.MODEL_PATH);
+
+
+	state->scene.models[0].setTransform(
+		{ 0.0f, 0.0f, 0.0f },   // position
+		{ 0.0f, 0.0f, 0.0f },    // rotation
+		{ 1.0f, 1.0f, 1.0f }     // scale
+	);
+
+	state->scene.models[1].setTransform(
+		{ -1.0f, 0.0f, 0.0f },
+		{ 0.0f, 0.0f, 0.0f },
+		{ 0.003f, 0.003f, 0.003f }
+	);
+	state->scene.models[2].setTransform(
+		{ 2.0f, 0.0f, 0.0f },
+		{ 0.0f, 0.0f, 0.0f },
+		{ 0.003f, 0.003f, 0.003f }
+	);
 
 	uniformBuffersCreate(state);
 
