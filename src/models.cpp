@@ -437,7 +437,7 @@ static void readTextureTransform(
 
 
 //Loading
-Model* modelLoad(State *state, std::string modelPath)
+void modelLoad(State *state, std::string modelPath)
 {
 	// Use tinygltf to load the model instead of tinyobjloader
 	state->scene.models.emplace_back();
@@ -499,7 +499,6 @@ Model* modelLoad(State *state, std::string modelPath)
 
 	for (const auto& m : gltfModel.materials) {
 		Material mat{};
-
 		// Base color factor
 		if (m.pbrMetallicRoughness.baseColorFactor.size() == 4) {
 			mat.baseColorFactor = glm::vec4(
@@ -631,7 +630,6 @@ Model* modelLoad(State *state, std::string modelPath)
 		state->scene.textures.push_back(tex);
 	}
 
-	return &model;
 }
 
 void modelUnload(State* state)

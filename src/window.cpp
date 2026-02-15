@@ -171,12 +171,12 @@ void windowCreate(State* state) {
 	state->scene.models[1].setTransform(
 		{ -1.0f, 0.0f, 0.0f },
 		{ 0.0f, 0.0f, 0.0f },
-		{ 0.003f, 0.003f, 0.003f }
+		{ 10.0f, 10.0f, 10.0f }
 	);
 	state->scene.models[2].setTransform(
 		{ 2.0f, 0.0f, 0.0f },
 		{ 0.0f, 0.0f, 0.0f },
-		{ 0.003f, 0.003f, 0.003f }
+		{ 1.0f, 1.0f, 1.0f }
 	);
 
 	uniformBuffersCreate(state);

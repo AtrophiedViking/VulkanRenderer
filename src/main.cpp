@@ -13,8 +13,8 @@ int main() {
 			.msaaSamples = VK_SAMPLE_COUNT_1_BIT,
 			.KOBOLD_TEXTURE_PATH = "res/textures/skin.ktx2",
 			.KOBOLD_MODEL_PATH = "res/models/Kobold.glb",
-			.HOVER_BIKE_MODEL_PATH = "res/models/hover_bike.glb",
-			.MODEL_PATH = "res/models/hover_bike.glb",
+			.HOVER_BIKE_MODEL_PATH = "res/models/MosquitoInAmber.glb",
+			.MODEL_PATH = "res/models/MultiUVTest.glb",
 		}
 	};
 	init(&state);
